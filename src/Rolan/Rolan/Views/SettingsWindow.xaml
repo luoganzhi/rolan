@@ -3,87 +3,102 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Rolan 设置"
         Width="420"
-        Height="480"
+        Height="500"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         WindowStyle="ToolWindow">
     <Window.Resources>
-        <Style TargetType="CheckBox" x:Key="SettingCheckBox">
-            <Setter Property="Margin" Value="0,6" />
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,8" />
             <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Width" Value="140" />
+            <Setter Property="Height" Value="26" />
+        </Style>
+        <Style TargetType="Separator">
+            <Setter Property="Margin" Value="0,10" />
         </Style>
     </Window.Resources>
 
-    <Grid Background="#F5F5F5">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="20">
-                <TextBlock Text="基本设置" FontSize="16" FontWeight="Bold" Margin="0,0,0,12" Foreground="#333" />
+    <ScrollViewer Background="#F8F8F8" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+            <!-- 标题 -->
+            <TextBlock Text="Rolan 设置" FontSize="20" FontWeight="Bold"
+                       Margin="0,4,0,16" Foreground="#2C3E50" FontFamily="Segoe UI" />
 
-                <CheckBox IsChecked="{Binding AutoHide}" Style="{StaticResource SettingCheckBox}"
-                          Content="贴边自动隐藏" />
-                <TextBlock Text="鼠标离开面板时自动隐藏，贴近屏幕边缘" FontSize="11" Foreground="#888" Margin="18,0,0,4" />
-
-                <CheckBox IsChecked="{Binding HideWhenLostFocus}" Style="{StaticResource SettingCheckBox}"
-                          Content="失去焦点时隐藏" />
-
-                <CheckBox IsChecked="{Binding TopMost}" Style="{StaticResource SettingCheckBox}"
-                          Content="始终保持置顶" />
-
-                <CheckBox IsChecked="{Binding MousePenetration}" Style="{StaticResource SettingCheckBox}"
-                          Content="鼠标穿透" />
-                <TextBlock Text="启用后鼠标可以穿透面板点击下方内容" FontSize="11" Foreground="#888" Margin="18,0,0,4" />
-
-                <Separator Margin="0,12" />
-
-                <TextBlock Text="外观" FontSize="16" FontWeight="Bold" Margin="0,0,0,12" Foreground="#333" />
-
-                <StackPanel Orientation="Horizontal" Margin="0,6">
-                    <TextBlock Text="主题:" Width="60" VerticalAlignment="Center" FontSize="13" />
-                    <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}"
-                              Width="160" />
+            <!-- 基本设置 -->
+            <TextBlock Text="基本行为" FontSize="13" FontWeight="SemiBold"
+                       Foreground="#7F8C8D" Margin="0,0,0,4" />
+            <Border Background="White" CornerRadius="6" Padding="14,6">
+                <StackPanel>
+                    <CheckBox IsChecked="{Binding AutoHide}" Content="贴边自动隐藏" />
+                    <CheckBox IsChecked="{Binding HideWhenLostFocus}" Content="失去焦点时自动隐藏" />
+                    <CheckBox IsChecked="{Binding TopMost}" Content="始终保持窗口置顶" />
+                    <CheckBox IsChecked="{Binding MousePenetration}" Content="鼠标穿透面板" />
                 </StackPanel>
+            </Border>
 
-                <StackPanel Orientation="Horizontal" Margin="0,6">
-                    <TextBlock Text="位置:" Width="60" VerticalAlignment="Center" FontSize="13" />
-                    <ComboBox ItemsSource="{Binding PanelSides}" SelectedIndex="{Binding SelectedPanelSideIndex}"
-                              Width="160" />
+            <Separator />
+
+            <!-- 外观 -->
+            <TextBlock Text="外观" FontSize="13" FontWeight="SemiBold"
+                       Foreground="#7F8C8D" Margin="0,0,0,4" />
+            <Border Background="White" CornerRadius="6" Padding="14,10">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                        <TextBlock Text="主题" Width="60" VerticalAlignment="Center" FontSize="13" />
+                        <ComboBox ItemsSource="{Binding Themes}"
+                                  Text="{Binding SelectedTheme, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                        <TextBlock Text="位置" Width="60" VerticalAlignment="Center" FontSize="13" />
+                        <ComboBox ItemsSource="{Binding PanelSides}"
+                                  SelectedIndex="{Binding SelectedPanelSideIndex, Mode=TwoWay}" />
+                    </StackPanel>
                 </StackPanel>
+            </Border>
 
-                <Separator Margin="0,12" />
+            <Separator />
 
-                <TextBlock Text="系统" FontSize="16" FontWeight="Bold" Margin="0,0,0,12" Foreground="#333" />
-
-                <CheckBox IsChecked="{Binding AutoStart}" Style="{StaticResource SettingCheckBox}"
-                          Content="开机自启" />
-
-                <Separator Margin="0,12" />
-
-                <TextBlock Text="数据管理" FontSize="16" FontWeight="Bold" Margin="0,0,0,12" Foreground="#333" />
-
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,6">
-                    <Button Content="导出数据" Width="90" Height="30"
-                            Command="{Binding ExportDataCommand}"
-                            Background="#4A90D9" Foreground="White" BorderThickness="0"
-                            FontSize="12" Cursor="Hand" />
-                    <Button Content="导入数据" Width="90" Height="30" Margin="10,0,0,0"
-                            Command="{Binding ImportDataCommand}"
-                            Background="#666" Foreground="White" BorderThickness="0"
-                            FontSize="12" Cursor="Hand" />
+            <!-- 系统 -->
+            <TextBlock Text="系统" FontSize="13" FontWeight="SemiBold"
+                       Foreground="#7F8C8D" Margin="0,0,0,4" />
+            <Border Background="White" CornerRadius="6" Padding="14,6">
+                <StackPanel>
+                    <CheckBox IsChecked="{Binding AutoStart}" Content="开机自启" />
+                    <TextBlock Text="Ctrl + Alt + R  呼出/隐藏面板"
+                               FontSize="11" Foreground="#95A5A6" Margin="2,2,0,8" />
                 </StackPanel>
+            </Border>
 
-                <Separator Margin="0,12" />
+            <Separator />
 
-                <TextBlock Text="快捷键: Ctrl+Alt+R 呼出/隐藏面板" FontSize="11" Foreground="#999" />
-
-                <!-- 按钮 -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                    <Button Content="保存" Width="80" Height="32"
-                            Command="{Binding SaveCommand}"
-                            Background="#4A90D9" Foreground="White" BorderThickness="0"
-                            FontSize="13" Cursor="Hand"
-                            Click="OnSaveClick" />
+            <!-- 数据 -->
+            <TextBlock Text="数据管理" FontSize="13" FontWeight="SemiBold"
+                       Foreground="#7F8C8D" Margin="0,0,0,4" />
+            <Border Background="White" CornerRadius="6" Padding="14,10">
+                <StackPanel>
+                    <WrapPanel Margin="0,4">
+                        <Button Content="导出数据" Width="90" Height="30"
+                                Command="{Binding ExportDataCommand}"
+                                Background="#3498DB" Foreground="White"
+                                BorderThickness="0" FontSize="12" Cursor="Hand" />
+                        <Button Content="导入数据" Width="90" Height="30" Margin="8,0,0,0"
+                                Command="{Binding ImportDataCommand}"
+                                Background="#7F8C8D" Foreground="White"
+                                BorderThickness="0" FontSize="12" Cursor="Hand" />
+                    </WrapPanel>
                 </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+            </Border>
+
+            <!-- 保存按钮 -->
+            <Button Content="保 存" Width="100" Height="34"
+                    HorizontalAlignment="Right" Margin="0,16,0,0"
+                    Command="{Binding SaveCommand}"
+                    Background="#2ECC71" Foreground="White"
+                    BorderThickness="0" FontSize="13" FontWeight="Bold"
+                    Cursor="Hand" Click="OnSaveClick" />
+        </StackPanel>
+    </ScrollViewer>
 </Window>

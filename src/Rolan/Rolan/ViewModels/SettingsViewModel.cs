@@ -1,4 +1,3 @@
-using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -11,6 +10,7 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly MainViewModel _mainVm;
     private readonly PanelService _panelService;
+    private readonly IThemeService _themeService;
     private readonly AppSettings _settings;
 
     [ObservableProperty]
@@ -37,13 +37,17 @@ public partial class SettingsViewModel : ObservableObject
     public string[] Themes { get; }
     public string[] PanelSides { get; } = { "左侧", "右侧" };
 
-    public SettingsViewModel(MainViewModel mainVm, PanelService panelService)
+    public SettingsViewModel(
+        MainViewModel mainVm,
+        PanelService panelService,
+        IThemeService themeService,
+        IAutoStartService autoStartService)
     {
         _mainVm = mainVm;
         _panelService = panelService;
+        _themeService = themeService;
         _settings = AppSettings.Load();
 
-        // 从设置加载
         _autoHide = _settings.AutoHide;
         _hideWhenLostFocus = _settings.HideWhenLostFocus;
         _mousePenetration = _settings.MousePenetration;
@@ -52,7 +56,7 @@ public partial class SettingsViewModel : ObservableObject
         _selectedTheme = _settings.Theme;
         _selectedPanelSideIndex = (int)_settings.PanelSide;
 
-        Themes = new[] { "Default", "Dark" };
+        Themes = _themeService.AvailableThemes;
     }
 
     [RelayCommand]
@@ -67,18 +71,14 @@ public partial class SettingsViewModel : ObservableObject
         _settings.PanelSide = (PanelSide)SelectedPanelSideIndex;
         _settings.Save();
 
-        // 应用设置
         _panelService.SetMousePenetration(MousePenetration);
         _panelService.SetTopMost(TopMost);
         _panelService.PositionPanel();
 
-        // 应用主题
-        var themeService = App.Current?.FindResource("ThemeService") as IThemeService;
-        themeService?.ApplyTheme(SelectedTheme);
+        _themeService.ApplyTheme(SelectedTheme);
 
-        // 开机自启
-        var autoStartService = new AutoStartService();
-        autoStartService.SetEnabled(AutoStart);
+        var autoStart = new AutoStartService();
+        autoStart.SetEnabled(AutoStart);
     }
 
     [RelayCommand]

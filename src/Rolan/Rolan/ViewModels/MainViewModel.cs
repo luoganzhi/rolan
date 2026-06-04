@@ -171,7 +171,7 @@ public partial class MainViewModel : ObservableObject
     private void OpenSettings()
     {
         var settingsWindow = new Views.SettingsWindow();
-        settingsWindow.DataContext = new SettingsViewModel(this, _panelService);
+        settingsWindow.DataContext = new SettingsViewModel(this, _panelService, _themeService, new AutoStartService());
         settingsWindow.ShowDialog();
     }
 

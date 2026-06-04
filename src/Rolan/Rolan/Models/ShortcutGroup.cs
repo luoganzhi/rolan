@@ -1,10 +1,21 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Rolan.Models;
 
-public class ShortcutGroup
+public partial class ShortcutGroup : ObservableObject
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public int Order { get; set; }
-    public byte[]? IconData { get; set; }
-    public List<ShortcutItem> Items { get; set; } = new();
+    [ObservableProperty]
+    private int _id;
+
+    [ObservableProperty]
+    private string _name = string.Empty;
+
+    [ObservableProperty]
+    private int _order;
+
+    [ObservableProperty]
+    private byte[]? _iconData;
+
+    [ObservableProperty]
+    private List<ShortcutItem> _items = new();
 }

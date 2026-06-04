@@ -8,7 +8,7 @@ namespace Rolan.Services;
 
 public class PanelService
 {
-    private readonly AppSettings _settings;
+    private AppSettings _settings;
     private Window? _window;
     private IntPtr _handle;
     private DispatcherTimer? _hideTimer;
@@ -77,9 +77,13 @@ public class PanelService
         _window.Width = panelWidth;
         _window.Height = waHeight;
         _window.Top = waY;
-        _window.Left = _settings.PanelSide == PanelSide.Left
-            ? waX
-            : waX + waWidth - panelWidth;
+        _window.Left = _isHidden
+            ? (_settings.PanelSide == PanelSide.Left
+                ? waX - panelWidth + HiddenEdgeWidth
+                : waX + waWidth - HiddenEdgeWidth)
+            : (_settings.PanelSide == PanelSide.Left
+                ? waX
+                : waX + waWidth - panelWidth);
     }
 
     public void CheckAutoHide()
@@ -259,5 +263,10 @@ public class PanelService
     {
         if (_window != null)
             WindowHelper.SetTopMost(_window, topMost);
+    }
+
+    public void UpdateSettings(AppSettings settings)
+    {
+        _settings = settings;
     }
 }

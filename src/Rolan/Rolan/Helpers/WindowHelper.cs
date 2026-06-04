@@ -44,6 +44,7 @@ internal static class WindowHelper
     public static void SetTopMost(Window window, bool topMost)
     {
         var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        window.Topmost = topMost;
         NativeMethods.SetWindowPos(hwnd,
             topMost ? NativeMethods.HWND_TOPMOST : NativeMethods.HWND_NOTOPMOST,
             0, 0, 0, 0,

@@ -49,7 +49,7 @@
                     <StackPanel Orientation="Horizontal" Margin="0,4">
                         <TextBlock Text="主题" Width="60" VerticalAlignment="Center" FontSize="13" />
                         <ComboBox ItemsSource="{Binding Themes}"
-                                  Text="{Binding SelectedTheme, Mode=TwoWay}" />
+                                  SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,4">
                         <TextBlock Text="位置" Width="60" VerticalAlignment="Center" FontSize="13" />

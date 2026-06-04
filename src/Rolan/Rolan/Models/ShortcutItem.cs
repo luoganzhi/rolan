@@ -1,3 +1,5 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Rolan.Models;
 
 public enum ShortcutType
@@ -8,16 +10,35 @@ public enum ShortcutType
     Url
 }
 
-public class ShortcutItem
+public partial class ShortcutItem : ObservableObject
 {
-    public int Id { get; set; }
-    public int GroupId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string TargetPath { get; set; } = string.Empty;
-    public string? Arguments { get; set; }
-    public string? WorkingDirectory { get; set; }
-    public byte[]? IconData { get; set; }
-    public int Order { get; set; }
-    public ShortcutType Type { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    [ObservableProperty]
+    private int _id;
+
+    [ObservableProperty]
+    private int _groupId;
+
+    [ObservableProperty]
+    private string _name = string.Empty;
+
+    [ObservableProperty]
+    private string _targetPath = string.Empty;
+
+    [ObservableProperty]
+    private string? _arguments;
+
+    [ObservableProperty]
+    private string? _workingDirectory;
+
+    [ObservableProperty]
+    private byte[]? _iconData;
+
+    [ObservableProperty]
+    private int _order;
+
+    [ObservableProperty]
+    private ShortcutType _type;
+
+    [ObservableProperty]
+    private DateTime _createdAt = DateTime.Now;
 }

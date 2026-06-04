@@ -20,6 +20,7 @@ public class DataService : IDataService
     {
         using var conn = new SqliteConnection(_connectionString);
         conn.Open();
+        EnableForeignKeys(conn);
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -49,12 +50,20 @@ public class DataService : IDataService
         cmd.ExecuteNonQuery();
     }
 
+    private static void EnableForeignKeys(SqliteConnection conn)
+    {
+        using var pragma = conn.CreateCommand();
+        pragma.CommandText = "PRAGMA foreign_keys = ON;";
+        pragma.ExecuteNonQuery();
+    }
+
     public async Task<List<ShortcutGroup>> LoadAllAsync()
     {
         var groups = new List<ShortcutGroup>();
 
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
 
         // 加载分组
         using var groupCmd = conn.CreateCommand();
@@ -107,6 +116,7 @@ public class DataService : IDataService
     {
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
 
         if (group.Id == 0)
         {
@@ -133,6 +143,7 @@ public class DataService : IDataService
     {
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM Groups WHERE Id = @id";
@@ -144,6 +155,7 @@ public class DataService : IDataService
     {
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
 
         if (item.Id == 0)
         {
@@ -191,6 +203,7 @@ public class DataService : IDataService
     {
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM ShortcutItems WHERE Id = @id";
@@ -202,6 +215,7 @@ public class DataService : IDataService
     {
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE Groups SET SortOrder = @o WHERE Id = @id";
         cmd.Parameters.AddWithValue("@o", newOrder);
@@ -213,6 +227,7 @@ public class DataService : IDataService
     {
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync();
+        EnableForeignKeys(conn);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE ShortcutItems SET SortOrder = @o WHERE Id = @id";
         cmd.Parameters.AddWithValue("@o", newOrder);

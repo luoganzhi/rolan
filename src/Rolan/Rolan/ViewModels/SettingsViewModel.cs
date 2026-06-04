@@ -11,6 +11,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly MainViewModel _mainVm;
     private readonly PanelService _panelService;
     private readonly IThemeService _themeService;
+    private readonly IAutoStartService _autoStartService;
+    private readonly IDataExportService _dataExportService;
     private readonly AppSettings _settings;
 
     [ObservableProperty]
@@ -41,11 +43,14 @@ public partial class SettingsViewModel : ObservableObject
         MainViewModel mainVm,
         PanelService panelService,
         IThemeService themeService,
-        IAutoStartService autoStartService)
+        IAutoStartService autoStartService,
+        IDataExportService dataExportService)
     {
         _mainVm = mainVm;
         _panelService = panelService;
         _themeService = themeService;
+        _autoStartService = autoStartService;
+        _dataExportService = dataExportService;
         _settings = AppSettings.Load();
 
         _autoHide = _settings.AutoHide;
@@ -71,14 +76,13 @@ public partial class SettingsViewModel : ObservableObject
         _settings.PanelSide = (PanelSide)SelectedPanelSideIndex;
         _settings.Save();
 
+        _panelService.UpdateSettings(_settings);
         _panelService.SetMousePenetration(MousePenetration);
         _panelService.SetTopMost(TopMost);
         _panelService.PositionPanel();
 
         _themeService.ApplyTheme(SelectedTheme);
-
-        var autoStart = new AutoStartService();
-        autoStart.SetEnabled(AutoStart);
+        _autoStartService.SetEnabled(AutoStart);
     }
 
     [RelayCommand]
@@ -93,9 +97,8 @@ public partial class SettingsViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            var exportService = new DataExportService();
-            var groups = _mainVm.Groups.ToList();
-            await exportService.ExportAsync(dialog.FileName, groups);
+            var groups = _mainVm.Groups.OrderBy(g => g.Order).ToList();
+            await _dataExportService.ExportAsync(dialog.FileName, groups);
             System.Windows.MessageBox.Show("导出成功！", "Rolan");
         }
     }
@@ -112,9 +115,8 @@ public partial class SettingsViewModel : ObservableObject
         {
             try
             {
-                var exportService = new DataExportService();
                 await _mainVm.ImportDataAsync(dialog.FileName);
-                System.Windows.MessageBox.Show("导入成功！请重启 Rolan 以应用更改。", "Rolan");
+                System.Windows.MessageBox.Show("导入成功！", "Rolan");
             }
             catch (Exception ex)
             {

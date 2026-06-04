@@ -9,15 +9,41 @@ public class DataExportService : IDataExportService
     {
         var options = new JsonSerializerOptions
         {
-            WriteIndented = true,
-            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve
+            WriteIndented = true
         };
+
+        var normalizedGroups = groups
+            .OrderBy(g => g.Order)
+            .Select(g => new ShortcutGroup
+            {
+                Id = g.Id,
+                Name = g.Name,
+                Order = g.Order,
+                IconData = g.IconData,
+                Items = g.Items
+                    .OrderBy(i => i.Order)
+                    .Select(i => new ShortcutItem
+                    {
+                        Id = i.Id,
+                        GroupId = i.GroupId,
+                        Name = i.Name,
+                        TargetPath = i.TargetPath,
+                        Arguments = i.Arguments,
+                        WorkingDirectory = i.WorkingDirectory,
+                        IconData = i.IconData,
+                        Order = i.Order,
+                        Type = i.Type,
+                        CreatedAt = i.CreatedAt
+                    })
+                    .ToList()
+            })
+            .ToList();
 
         var data = new ExportData
         {
             Version = 1,
             ExportTime = DateTime.Now,
-            Groups = groups
+            Groups = normalizedGroups
         };
 
         var json = JsonSerializer.Serialize(data, options);
@@ -27,7 +53,18 @@ public class DataExportService : IDataExportService
     public async Task<List<ShortcutGroup>> ImportAsync(string filePath)
     {
         var json = await File.ReadAllTextAsync(filePath);
-        var data = JsonSerializer.Deserialize<ExportData>(json);
+        ExportData? data;
+        try
+        {
+            data = JsonSerializer.Deserialize<ExportData>(json, new JsonSerializerOptions
+            {
+                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve
+            });
+        }
+        catch (JsonException)
+        {
+            data = JsonSerializer.Deserialize<ExportData>(json);
+        }
 
         if (data?.Groups == null)
             throw new InvalidDataException("导入文件格式错误");

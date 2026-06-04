@@ -2,18 +2,23 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Rolan.Models;
+using Rolan.Services;
 using Rolan.ViewModels;
 
 namespace Rolan.Views;
 
 public partial class MainWindow : Window
 {
+    private readonly IHotkeyService _hotkeyService;
+    private IntPtr _windowHandle;
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
-    public MainWindow()
+    public MainWindow(IHotkeyService hotkeyService)
     {
+        _hotkeyService = hotkeyService;
         InitializeComponent();
         SourceInitialized += OnSourceInitialized;
+        Closed += OnClosed;
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -21,17 +26,18 @@ public partial class MainWindow : Window
         var vm = ViewModel;
         if (vm == null) return;
 
-        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-        var source = System.Windows.Interop.HwndSource.FromHwnd(hwnd);
+        _windowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var source = System.Windows.Interop.HwndSource.FromHwnd(_windowHandle);
         source?.AddHook(WndProc);
 
         // 注册全局热键
         var settings = AppSettings.Load();
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
+        vm.PanelService.UpdateSettings(settings);
+        if (!_hotkeyService.Register(_windowHandle, 1, settings.HotkeyModifiers, settings.HotkeyKey))
         {
-            var hotkeyService = App.Current?.FindResource("HotkeyService") as Services.IHotkeyService;
-            hotkeyService?.Register(hwnd, 1, settings.HotkeyModifiers, settings.HotkeyKey);
-        });
+            MessageBox.Show("全局热键注册失败，快捷键可能已被其他程序占用。", "Rolan",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
 
         // 绑定面板服务
         vm.PanelService.Attach(this);
@@ -42,7 +48,7 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == Helpers.NativeMethods.WM_HOTKEY && wParam.ToInt32() == 1)
+        if (msg == Rolan.Helpers.NativeMethods.WM_HOTKEY && wParam.ToInt32() == 1)
         {
             ViewModel?.ToggleVisibilityCommand.Execute(null);
             handled = true;
@@ -74,12 +80,13 @@ public partial class MainWindow : Window
 
     // ---- 拖拽添加 ----
 
-    private void OnDrop(object sender, DragEventArgs e)
+    private async void OnDrop(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            ViewModel?.AddShortcutFromDragDrop(files);
+            if (ViewModel != null)
+                await ViewModel.AddShortcutFromDragDrop(files);
         }
         else if (e.Data.GetDataPresent(DataFormats.Text))
         {
@@ -88,7 +95,8 @@ public partial class MainWindow : Window
                 (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                  text.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
             {
-                ViewModel?.AddShortcutCommand.Execute(text);
+                if (ViewModel != null)
+                    await ViewModel.AddShortcutCommand.ExecuteAsync(text);
             }
         }
     }
@@ -130,13 +138,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnEditShortcut(object sender, RoutedEventArgs e)
+    private async void OnEditShortcut(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
         {
             var dialog = new EditShortcutDialog(item);
             dialog.Owner = this;
-            dialog.ShowDialog();
+            if (dialog.ShowDialog() == true && ViewModel != null)
+                await ViewModel.UpdateShortcutAsync(item);
         }
     }
 
@@ -200,6 +209,12 @@ public partial class MainWindow : Window
         base.OnMouseLeftButtonDown(e);
         if (e.LeftButton == MouseButtonState.Pressed)
             DragMove();
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        if (_windowHandle != IntPtr.Zero)
+            _hotkeyService.Unregister(_windowHandle, 1);
     }
 }
 

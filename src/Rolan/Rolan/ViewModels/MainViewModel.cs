@@ -12,8 +12,9 @@ public partial class MainViewModel : ObservableObject
     private readonly IDataService _dataService;
     private readonly IShellService _shellService;
     private readonly PanelService _panelService;
-    private readonly IHotkeyService _hotkeyService;
     private readonly IThemeService _themeService;
+    private readonly IAutoStartService _autoStartService;
+    private readonly IDataExportService _dataExportService;
 
     public PanelService PanelService => _panelService;
 
@@ -33,16 +34,16 @@ public partial class MainViewModel : ObservableObject
         IDataService dataService,
         IShellService shellService,
         PanelService panelService,
-        IHotkeyService hotkeyService,
-        IThemeService themeService)
+        IThemeService themeService,
+        IAutoStartService autoStartService,
+        IDataExportService dataExportService)
     {
         _dataService = dataService;
         _shellService = shellService;
         _panelService = panelService;
-        _hotkeyService = hotkeyService;
         _themeService = themeService;
-
-        _panelService.VisibilityChanged += OnPanelVisibilityChanged;
+        _autoStartService = autoStartService;
+        _dataExportService = dataExportService;
 
         _ = LoadDataAsync();
 
@@ -50,6 +51,8 @@ public partial class MainViewModel : ObservableObject
         var settings = AppSettings.Load();
         _themeService.ApplyTheme(settings.Theme);
     }
+
+    public IEnumerable<ShortcutItem> FilteredItems => GetFilteredItems();
 
     private async Task LoadDataAsync()
     {
@@ -70,12 +73,18 @@ public partial class MainViewModel : ObservableObject
     partial void OnSearchTextChanged(string value)
     {
         IsSearching = !string.IsNullOrWhiteSpace(value);
+        RefreshFilteredItems();
+    }
+
+    partial void OnSelectedGroupChanged(ShortcutGroup? value)
+    {
+        RefreshFilteredItems();
     }
 
     /// <summary>
     /// 获取过滤后的快捷方式列表
     /// </summary>
-    public IEnumerable<ShortcutItem> GetFilteredItems()
+    private IEnumerable<ShortcutItem> GetFilteredItems()
     {
         var group = SelectedGroup;
         if (group == null) return Enumerable.Empty<ShortcutItem>();
@@ -85,10 +94,16 @@ public partial class MainViewModel : ObservableObject
             return Groups.SelectMany(g => g.Items)
                 .Where(i => i.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
                          || i.TargetPath.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(i => i.Name);
+                .OrderBy(i => i.Name)
+                .ToList();
         }
 
-        return group.Items.OrderBy(i => i.Order);
+        return group.Items.OrderBy(i => i.Order).ToList();
+    }
+
+    private void RefreshFilteredItems()
+    {
+        OnPropertyChanged(nameof(FilteredItems));
     }
 
     [RelayCommand]
@@ -104,7 +119,7 @@ public partial class MainViewModel : ObservableObject
         var newGroup = new ShortcutGroup
         {
             Name = $"分组 {Groups.Count + 1}",
-            Order = Groups.Count
+            Order = Groups.Any() ? Groups.Max(g => g.Order) + 1 : 0
         };
         await _dataService.SaveGroupAsync(newGroup);
         Groups.Add(newGroup);
@@ -136,10 +151,10 @@ public partial class MainViewModel : ObservableObject
         var item = new ShortcutItem
         {
             GroupId = SelectedGroup.Id,
-            Name = Path.GetFileNameWithoutExtension(targetPath),
+            Name = GetShortcutName(targetPath, type),
             TargetPath = targetPath,
             Type = type,
-            Order = SelectedGroup.Items.Count
+            Order = SelectedGroup.Items.Any() ? SelectedGroup.Items.Max(i => i.Order) + 1 : 0
         };
 
         // 尝试提取图标
@@ -148,30 +163,32 @@ public partial class MainViewModel : ObservableObject
             var icon = _shellService.ExtractIcon(targetPath);
             if (icon != null)
             {
-                item.IconData = Helpers.IconHelper.BitmapSourceToBytes(icon);
+                item.IconData = Rolan.Helpers.IconHelper.BitmapSourceToBytes(icon);
             }
         }
         catch { }
 
         await _dataService.SaveItemAsync(item);
         SelectedGroup.Items.Add(item);
-        OnPropertyChanged(nameof(GetFilteredItems));
+        RefreshFilteredItems();
     }
 
     [RelayCommand]
     private async Task DeleteShortcut(ShortcutItem? item)
     {
         if (item == null) return;
+        var sourceGroup = Groups.FirstOrDefault(g => g.Id == item.GroupId);
+        if (sourceGroup == null) return;
         await _dataService.DeleteItemAsync(item.Id);
-        SelectedGroup?.Items.Remove(item);
-        OnPropertyChanged(nameof(GetFilteredItems));
+        sourceGroup.Items.Remove(item);
+        RefreshFilteredItems();
     }
 
     [RelayCommand]
     private void OpenSettings()
     {
         var settingsWindow = new Views.SettingsWindow();
-        settingsWindow.DataContext = new SettingsViewModel(this, _panelService, _themeService, new AutoStartService());
+        settingsWindow.DataContext = new SettingsViewModel(this, _panelService, _themeService, _autoStartService, _dataExportService);
         settingsWindow.ShowDialog();
     }
 
@@ -182,7 +199,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void BrowseAddShortcut()
+    private async Task BrowseAddShortcut()
     {
         if (SelectedGroup == null) return;
 
@@ -196,7 +213,7 @@ public partial class MainViewModel : ObservableObject
         if (dialog.ShowDialog() == true)
         {
             foreach (var file in dialog.FileNames)
-                _ = AddShortcut(file);
+                await AddShortcut(file);
         }
     }
 
@@ -209,18 +226,21 @@ public partial class MainViewModel : ObservableObject
 
         sourceGroup.Items.Remove(item);
         item.GroupId = targetGroup.Id;
-        item.Order = targetGroup.Items.Count;
+        item.Order = targetGroup.Items.Any() ? targetGroup.Items.Max(i => i.Order) + 1 : 0;
         targetGroup.Items.Add(item);
 
         await _dataService.SaveItemAsync(item);
-        OnPropertyChanged(nameof(GetFilteredItems));
+        RefreshFilteredItems();
     }
 
     [RelayCommand]
     private async Task MoveShortcutUp(ShortcutItem? item)
     {
-        if (item == null || SelectedGroup == null) return;
-        var items = SelectedGroup.Items.OrderBy(i => i.Order).ToList();
+        if (item == null) return;
+        var sourceGroup = Groups.FirstOrDefault(g => g.Id == item.GroupId);
+        if (sourceGroup == null) return;
+
+        var items = sourceGroup.Items.OrderBy(i => i.Order).ToList();
         var idx = items.IndexOf(item);
         if (idx <= 0) return;
 
@@ -228,14 +248,17 @@ public partial class MainViewModel : ObservableObject
         (item.Order, prev.Order) = (prev.Order, item.Order);
         await _dataService.ReorderItemAsync(item.Id, item.Order);
         await _dataService.ReorderItemAsync(prev.Id, prev.Order);
-        OnPropertyChanged(nameof(GetFilteredItems));
+        RefreshFilteredItems();
     }
 
     [RelayCommand]
     private async Task MoveShortcutDown(ShortcutItem? item)
     {
-        if (item == null || SelectedGroup == null) return;
-        var items = SelectedGroup.Items.OrderBy(i => i.Order).ToList();
+        if (item == null) return;
+        var sourceGroup = Groups.FirstOrDefault(g => g.Id == item.GroupId);
+        if (sourceGroup == null) return;
+
+        var items = sourceGroup.Items.OrderBy(i => i.Order).ToList();
         var idx = items.IndexOf(item);
         if (idx < 0 || idx >= items.Count - 1) return;
 
@@ -243,38 +266,59 @@ public partial class MainViewModel : ObservableObject
         (item.Order, next.Order) = (next.Order, item.Order);
         await _dataService.ReorderItemAsync(item.Id, item.Order);
         await _dataService.ReorderItemAsync(next.Id, next.Order);
-        OnPropertyChanged(nameof(GetFilteredItems));
+        RefreshFilteredItems();
     }
 
-    public void AddShortcutFromDragDrop(string[] files)
+    public async Task AddShortcutFromDragDrop(string[] files)
     {
         if (SelectedGroup == null) return;
         foreach (var file in files)
         {
-            _ = AddShortcut(file);
+            await AddShortcut(file);
         }
     }
 
     public async Task ImportDataAsync(string filePath)
     {
-        var exportService = new DataExportService();
-        var groups = await exportService.ImportAsync(filePath);
+        var groups = await _dataExportService.ImportAsync(filePath);
 
-        foreach (var group in groups)
+        foreach (var group in groups.OrderBy(g => g.Order))
         {
-            var existingIds = Groups.Select(g => g.Id).ToHashSet();
-            group.Id = Groups.Count > 0 ? Groups.Max(g => g.Id) + 1 : 1;
+            group.Order = Groups.Any() ? Groups.Max(g => g.Order) + 1 : 0;
+            group.Id = 0;
 
             await _dataService.SaveGroupAsync(group);
             Groups.Add(group);
 
-            foreach (var item in group.Items)
+            foreach (var item in group.Items.OrderBy(i => i.Order))
             {
                 item.Id = 0;
                 item.GroupId = group.Id;
                 await _dataService.SaveItemAsync(item);
             }
         }
+
+        if (SelectedGroup == null)
+            SelectedGroup = Groups.FirstOrDefault();
+
+        RefreshFilteredItems();
+    }
+
+    public async Task UpdateShortcutAsync(ShortcutItem? item)
+    {
+        if (item == null) return;
+
+        item.Type = DetectType(item.TargetPath);
+        try
+        {
+            var icon = _shellService.ExtractIcon(item.TargetPath);
+            if (icon != null)
+                item.IconData = Rolan.Helpers.IconHelper.BitmapSourceToBytes(icon);
+        }
+        catch { }
+
+        await _dataService.SaveItemAsync(item);
+        RefreshFilteredItems();
     }
 
     private static ShortcutType DetectType(string path)
@@ -289,7 +333,9 @@ public partial class MainViewModel : ObservableObject
                 var ext = Path.GetExtension(path).ToLowerInvariant();
                 return ext is ".exe" or ".lnk" or ".bat" or ".cmd"
                     ? ShortcutType.Application
-                    : ShortcutType.File;
+                    : ext == ".url"
+                        ? ShortcutType.Url
+                        : ShortcutType.File;
             }
             if (Directory.Exists(path))
                 return ShortcutType.Folder;
@@ -299,8 +345,21 @@ public partial class MainViewModel : ObservableObject
         return ShortcutType.File;
     }
 
-    private void OnPanelVisibilityChanged()
+    private static string GetShortcutName(string path, ShortcutType type)
     {
-        OnPropertyChanged(nameof(PanelService));
+        if (type == ShortcutType.Url && Uri.TryCreate(path, UriKind.Absolute, out var uri))
+            return string.IsNullOrWhiteSpace(uri.Host) ? path : uri.Host;
+
+        if (Directory.Exists(path))
+        {
+            var name = new DirectoryInfo(path).Name;
+            return string.IsNullOrWhiteSpace(name) ? path : name;
+        }
+
+        if (File.Exists(path))
+            return Path.GetFileNameWithoutExtension(path);
+
+        var name = Path.GetFileNameWithoutExtension(path);
+        return string.IsNullOrWhiteSpace(name) ? path : name;
     }
 }

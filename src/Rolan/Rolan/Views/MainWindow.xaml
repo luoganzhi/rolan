@@ -238,7 +238,7 @@
                           Background="Transparent"
                           AllowDrop="True">
                 <ItemsControl x:Name="ShortcutGrid"
-                              ItemsSource="{Binding GetFilteredItems}"
+                              ItemsSource="{Binding FilteredItems}"
                               ItemTemplate="{StaticResource ShortcutItemTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

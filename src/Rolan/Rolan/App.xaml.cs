@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Drawing;
 using System.Windows;
 using Rolan.Services;
@@ -126,22 +125,6 @@ public partial class App : Application
             _mainWindow.Closing -= OnMainWindowClosing;
             _mainWindow.Close();
         }
-
-        try
-        {
-            // 注销热键
-            if (_mainWindow != null)
-            {
-                var hwnd = new System.Windows.Interop.WindowInteropHelper(_mainWindow).Handle;
-                var hotkeyService = _services.GetRequiredService<IHotkeyService>();
-                _mainWindow.Closing -= OnMainWindowClosing;
-            }
-
-            // 保存设置
-            var settings = Models.AppSettings.Load();
-            settings.Save();
-        }
-        catch { }
 
         Shutdown();
     }

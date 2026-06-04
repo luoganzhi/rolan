@@ -1,0 +1,16 @@
+{
+  "defaultGroups": [
+    {
+      "name": "常用工具",
+      "items": []
+    },
+    {
+      "name": "开发工具",
+      "items": []
+    },
+    {
+      "name": "文件夹",
+      "items": []
+    }
+  ]
+}

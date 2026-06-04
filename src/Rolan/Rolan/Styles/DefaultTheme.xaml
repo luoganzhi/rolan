@@ -1,0 +1,15 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 默认主题 (亮色) -->
+    <SolidColorBrush x:Key="PanelBg" Color="#F2F2F2" />
+    <SolidColorBrush x:Key="TitleBarBg" Color="#E8E8E8" />
+    <SolidColorBrush x:Key="TabBarBg" Color="#E8E8E8" />
+    <SolidColorBrush x:Key="SearchBarBg" Color="#E0E0E0" />
+    <SolidColorBrush x:Key="TextPrimary" Color="#333333" />
+    <SolidColorBrush x:Key="TextSecondary" Color="#888888" />
+    <SolidColorBrush x:Key="ItemBg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ItemBorder" Color="#CCCCCC" />
+    <SolidColorBrush x:Key="Accent" Color="#4A90D9" />
+
+</ResourceDictionary>

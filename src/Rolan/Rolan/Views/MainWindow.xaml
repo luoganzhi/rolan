@@ -1,0 +1,181 @@
+<Window x:Class="Rolan.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:Rolan.Models"
+        xmlns:vm="clr-namespace:Rolan.ViewModels"
+        xmlns:cvt="clr-namespace:Rolan.Converters"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        Width="320"
+        Height="600"
+        Title="Rolan">
+    <Window.Resources>
+        <cvt:IconToImageConverter x:Key="IconConverter" />
+        <cvt:BoolToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Border Background="#F0F0F0"
+            CornerRadius="8"
+            BorderBrush="#40000000"
+            BorderThickness="1"
+            Margin="4"
+            MouseEnter="OnPanelMouseEnter"
+            MouseLeave="OnPanelMouseLeave"
+            AllowDrop="True"
+            Drop="OnDrop"
+            DragEnter="OnDragEnter">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="12" Opacity="0.25" ShadowDepth="2" Color="Black"/>
+        </Border.Effect>
+
+        <DockPanel>
+            <!-- 标题栏 -->
+            <Border DockPanel.Dock="Top" Background="#E8E8E8" CornerRadius="8,8,0,0" Height="36">
+                <DockPanel>
+                    <TextBlock Text="Rolan" FontSize="13" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="12,0,0,0"
+                               Foreground="#333" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,4,0">
+                        <Button x:Name="SettingsBtn" Content="⚙" Width="28" Height="28"
+                                Background="Transparent" BorderThickness="0"
+                                FontSize="14" Cursor="Hand"
+                                Click="OnSettingsClick" ToolTip="设置" />
+                        <Button x:Name="HideBtn" Content="◀" Width="28" Height="28"
+                                Background="Transparent" BorderThickness="0"
+                                FontSize="14" Cursor="Hand"
+                                Click="OnHideClick" ToolTip="隐藏面板" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- 搜索框 -->
+            <Border DockPanel.Dock="Top" Background="#E0E0E0" Padding="8,4" Height="32">
+                <TextBox x:Name="SearchBox"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="12"
+                         Padding="4,0"
+                         Background="White"
+                         BorderBrush="#C0C0C0"
+                         BorderThickness="1"
+                         VerticalContentAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Text" Value=""/>
+                            <Setter Property="ToolTip" Value="搜索快捷方式..."/>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+            </Border>
+
+            <!-- 标签页 -->
+            <Border DockPanel.Dock="Top" Background="#E8E8E8" Height="32">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Content="+"
+                            Width="28"
+                            FontSize="16"
+                            FontWeight="Bold"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            Click="OnAddGroupClick"
+                            ToolTip="添加分组" />
+                    <ListBox x:Name="GroupTabBar"
+                             ItemsSource="{Binding Groups}"
+                             SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="models:ShortcutGroup">
+                                <Border Padding="10,4" Margin="2,0" CornerRadius="4"
+                                        Background="Transparent">
+                                    <TextBlock Text="{Binding Name}" FontSize="12"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#CCFFFFFF" />
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- 快捷方式网格 -->
+            <ScrollViewer DockPanel.Dock="Bottom"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="4"
+                          Background="Transparent">
+                <ItemsControl x:Name="ShortcutGrid"
+                              ItemsSource="{Binding GetFilteredItems}"
+                              AllowDrop="True">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="models:ShortcutItem">
+                            <Border Width="72" Height="Auto"
+                                    Padding="4" Margin="2"
+                                    Background="Transparent"
+                                    Cursor="Hand"
+                                    ToolTip="{Binding TargetPath}"
+                                    MouseDown="OnShortcutMouseDown">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="打开文件位置" Click="OnOpenFileLocation" />
+                                        <Separator />
+                                        <MenuItem Header="编辑..." Click="OnEditShortcut" />
+                                        <MenuItem Header="删除" Click="OnDeleteShortcut" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <Border Width="48" Height="48" CornerRadius="6"
+                                            Background="#FFF" BorderBrush="#CCC" BorderThickness="1"
+                                            HorizontalAlignment="Center">
+                                        <Image Source="{Binding IconData, Converter={StaticResource IconConverter}}"
+                                               Width="32" Height="32"
+                                               Margin="0,0,0,0"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="10"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               MaxHeight="28"
+                                               LineHeight="13"
+                                               LineStackingStrategy="BlockLineHeight"
+                                               Margin="0,2,0,0"
+                                               HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</Window>

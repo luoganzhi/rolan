@@ -69,6 +69,16 @@
                         <MenuItem Header="打开" Click="OnOpenShortcut" />
                         <MenuItem Header="打开文件位置" Click="OnOpenFileLocation" />
                         <Separator />
+                        <MenuItem Header="上移" Click="OnMoveUp" />
+                        <MenuItem Header="下移" Click="OnMoveDown" />
+                        <MenuItem Header="移动到分组" ItemsSource="{Binding Source={RelativeSource AncestorType=Window}, Path=DataContext.Groups}">
+                            <MenuItem.ItemTemplate>
+                                <DataTemplate DataType="models:ShortcutGroup">
+                                    <MenuItem Header="{Binding Name}" Click="OnMoveToGroup" />
+                                </DataTemplate>
+                            </MenuItem.ItemTemplate>
+                        </MenuItem>
+                        <Separator />
                         <MenuItem Header="编辑..." Click="OnEditShortcut" />
                         <MenuItem Header="删除" Click="OnDeleteShortcut" />
                     </ContextMenu>
@@ -128,6 +138,14 @@
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,0,4,0">
+                        <Button Content="+"
+                                Width="28" Height="28"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                FontSize="16" Cursor="Hand"
+                                Foreground="#555"
+                                Click="OnBrowseAdd"
+                                ToolTip="浏览添加文件" />
                         <Button Content="⚙"
                                 Width="28" Height="28"
                                 Background="Transparent"

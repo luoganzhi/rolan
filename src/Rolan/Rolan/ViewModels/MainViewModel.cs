@@ -181,6 +181,71 @@ public partial class MainViewModel : ObservableObject
         _panelService.ToggleVisibility();
     }
 
+    [RelayCommand]
+    private void BrowseAddShortcut()
+    {
+        if (SelectedGroup == null) return;
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "选择要添加的文件",
+            Filter = "所有文件 (*.*)|*.*|程序 (*.exe)|*.exe|快捷方式 (*.lnk)|*.lnk",
+            Multiselect = true
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            foreach (var file in dialog.FileNames)
+                _ = AddShortcut(file);
+        }
+    }
+
+    [RelayCommand]
+    private async Task MoveToGroup(Tuple<ShortcutItem, ShortcutGroup> args)
+    {
+        var (item, targetGroup) = args;
+        var sourceGroup = Groups.FirstOrDefault(g => g.Id == item.GroupId);
+        if (sourceGroup == null) return;
+
+        sourceGroup.Items.Remove(item);
+        item.GroupId = targetGroup.Id;
+        item.Order = targetGroup.Items.Count;
+        targetGroup.Items.Add(item);
+
+        await _dataService.SaveItemAsync(item);
+        OnPropertyChanged(nameof(GetFilteredItems));
+    }
+
+    [RelayCommand]
+    private async Task MoveShortcutUp(ShortcutItem? item)
+    {
+        if (item == null || SelectedGroup == null) return;
+        var items = SelectedGroup.Items.OrderBy(i => i.Order).ToList();
+        var idx = items.IndexOf(item);
+        if (idx <= 0) return;
+
+        var prev = items[idx - 1];
+        (item.Order, prev.Order) = (prev.Order, item.Order);
+        await _dataService.ReorderItemAsync(item.Id, item.Order);
+        await _dataService.ReorderItemAsync(prev.Id, prev.Order);
+        OnPropertyChanged(nameof(GetFilteredItems));
+    }
+
+    [RelayCommand]
+    private async Task MoveShortcutDown(ShortcutItem? item)
+    {
+        if (item == null || SelectedGroup == null) return;
+        var items = SelectedGroup.Items.OrderBy(i => i.Order).ToList();
+        var idx = items.IndexOf(item);
+        if (idx < 0 || idx >= items.Count - 1) return;
+
+        var next = items[idx + 1];
+        (item.Order, next.Order) = (next.Order, item.Order);
+        await _dataService.ReorderItemAsync(item.Id, item.Order);
+        await _dataService.ReorderItemAsync(next.Id, next.Order);
+        OnPropertyChanged(nameof(GetFilteredItems));
+    }
+
     public void AddShortcutFromDragDrop(string[] files)
     {
         if (SelectedGroup == null) return;

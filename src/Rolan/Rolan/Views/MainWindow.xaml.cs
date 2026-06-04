@@ -69,6 +69,9 @@ public partial class MainWindow : Window
     private void OnAddGroupClick(object sender, RoutedEventArgs e)
         => ViewModel?.AddGroupCommand.Execute(null);
 
+    private void OnBrowseAdd(object sender, RoutedEventArgs e)
+        => ViewModel?.BrowseAddShortcutCommand.Execute(null);
+
     // ---- 拖拽添加 ----
 
     private void OnDrop(object sender, DragEventArgs e)
@@ -143,6 +146,27 @@ public partial class MainWindow : Window
             ViewModel?.DeleteShortcutCommand.Execute(item);
     }
 
+    private void OnMoveUp(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
+            ViewModel?.MoveShortcutUpCommand.Execute(item);
+    }
+
+    private void OnMoveDown(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
+            ViewModel?.MoveShortcutDownCommand.Execute(item);
+    }
+
+    private void OnMoveToGroup(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.DataContext is ShortcutGroup targetGroup &&
+            mi.TryFindParent<ContextMenu>()?.DataContext is ShortcutItem item)
+        {
+            ViewModel?.MoveToGroupCommand.Execute(new Tuple<ShortcutItem, ShortcutGroup>(item, targetGroup));
+        }
+    }
+
     // ---- 标签页右键菜单处理 ----
 
     private void OnRenameGroup(object sender, RoutedEventArgs e)
@@ -176,5 +200,19 @@ public partial class MainWindow : Window
         base.OnMouseLeftButtonDown(e);
         if (e.LeftButton == MouseButtonState.Pressed)
             DragMove();
+    }
+}
+
+internal static class WpfExtensions
+{
+    public static T? TryFindParent<T>(this DependencyObject child) where T : DependencyObject
+    {
+        var parent = VisualTreeHelper.GetParent(child);
+        while (parent != null)
+        {
+            if (parent is T t) return t;
+            parent = VisualTreeHelper.GetParent(parent);
+        }
+        return null;
     }
 }

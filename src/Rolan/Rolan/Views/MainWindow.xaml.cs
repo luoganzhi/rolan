@@ -107,6 +107,12 @@ public partial class MainWindow : Window
 
     // ---- 右键菜单处理 ----
 
+    private void OnOpenShortcut(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
+            ViewModel?.LaunchItemCommand.Execute(item);
+    }
+
     private void OnOpenFileLocation(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
@@ -135,6 +141,32 @@ public partial class MainWindow : Window
     {
         if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
             ViewModel?.DeleteShortcutCommand.Execute(item);
+    }
+
+    // ---- 标签页右键菜单处理 ----
+
+    private void OnRenameGroup(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi || mi.DataContext is not ShortcutGroup group) return;
+
+        var dialog = new InputDialog("重命名分组", "请输入新的分组名称:", group.Name);
+        dialog.Owner = this;
+        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Result))
+        {
+            group.Name = dialog.Result;
+            ViewModel?.RenameGroupCommand.Execute(group);
+        }
+    }
+
+    private void OnDeleteGroup(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi || mi.DataContext is not ShortcutGroup group) return;
+
+        if (MessageBox.Show($"确认删除分组 \"{group.Name}\" 及其所有快捷方式？",
+                "Rolan", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+        {
+            ViewModel?.DeleteGroupCommand.Execute(group);
+        }
     }
 
     // ---- 窗口拖动 ----

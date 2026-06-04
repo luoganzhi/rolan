@@ -21,23 +21,23 @@ public partial class MainWindow : Window
         var vm = ViewModel;
         if (vm == null) return;
 
-        // 注册全局热键
-        var settings = Models.AppSettings.Load();
         var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         var source = System.Windows.Interop.HwndSource.FromHwnd(hwnd);
         source?.AddHook(WndProc);
 
-        // 延迟注册热键以确保窗口句柄有效
+        // 注册全局热键
+        var settings = AppSettings.Load();
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
         {
             var hotkeyService = App.Current?.FindResource("HotkeyService") as Services.IHotkeyService;
             hotkeyService?.Register(hwnd, 1, settings.HotkeyModifiers, settings.HotkeyKey);
         });
 
-        // 绑定 PanelService
+        // 绑定面板服务
         vm.PanelService.Attach(this);
         vm.PanelService.PositionPanel();
         vm.PanelService.SetMousePenetration(settings.MousePenetration);
+        vm.PanelService.SetTopMost(settings.TopMost);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -50,32 +50,27 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
+    // ---- 鼠标面板事件 ----
+
     private void OnPanelMouseEnter(object sender, MouseEventArgs e)
-    {
-        ViewModel?.PanelService.OnMouseEnter();
-    }
+        => ViewModel?.PanelService.OnMouseEnter();
 
     private void OnPanelMouseLeave(object sender, MouseEventArgs e)
-    {
-        ViewModel?.PanelService.OnMouseLeave();
-    }
+        => ViewModel?.PanelService.OnMouseLeave();
+
+    // ---- 按钮事件 ----
 
     private void OnSettingsClick(object sender, RoutedEventArgs e)
-    {
-        ViewModel?.OpenSettingsCommand.Execute(null);
-    }
+        => ViewModel?.OpenSettingsCommand.Execute(null);
 
     private void OnHideClick(object sender, RoutedEventArgs e)
-    {
-        ViewModel?.ToggleVisibilityCommand.Execute(null);
-    }
+        => ViewModel?.ToggleVisibilityCommand.Execute(null);
 
     private void OnAddGroupClick(object sender, RoutedEventArgs e)
-    {
-        ViewModel?.AddGroupCommand.Execute(null);
-    }
+        => ViewModel?.AddGroupCommand.Execute(null);
 
-    // 拖拽添加
+    // ---- 拖拽添加 ----
+
     private void OnDrop(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -86,7 +81,9 @@ public partial class MainWindow : Window
         else if (e.Data.GetDataPresent(DataFormats.Text))
         {
             var text = e.Data.GetData(DataFormats.Text) as string;
-            if (!string.IsNullOrEmpty(text) && (text.StartsWith("http://") || text.StartsWith("https://")))
+            if (!string.IsNullOrEmpty(text) &&
+                (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 text.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
             {
                 ViewModel?.AddShortcutCommand.Execute(text);
             }
@@ -99,7 +96,17 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // ContextMenu 事件处理
+    // ---- 快捷方式点击启动 ----
+
+    private void OnShortcutMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Border border && border.DataContext is ShortcutItem item)
+            ViewModel?.LaunchItemCommand.Execute(item);
+        e.Handled = true;
+    }
+
+    // ---- 右键菜单处理 ----
+
     private void OnOpenFileLocation(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
@@ -118,35 +125,20 @@ public partial class MainWindow : Window
     {
         if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
         {
-            // 简单的编辑对话框
-            var name = Microsoft.VisualBasic.Interaction.InputBox("名称:", "编辑快捷方式", item.Name);
-            if (!string.IsNullOrEmpty(name))
-            {
-                item.Name = name;
-                ViewModel?.GetType().GetMethod("RenameGroupCommand")?.Invoke(ViewModel, new[] { item });
-            }
+            var dialog = new EditShortcutDialog(item);
+            dialog.Owner = this;
+            dialog.ShowDialog();
         }
     }
 
     private void OnDeleteShortcut(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && mi.DataContext is ShortcutItem item)
-        {
             ViewModel?.DeleteShortcutCommand.Execute(item);
-        }
     }
 
-    // 快捷方式单击启动
-    private void OnShortcutMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is Border border && border.DataContext is ShortcutItem item)
-        {
-            ViewModel?.LaunchItemCommand.Execute(item);
-        }
-        e.Handled = true;
-    }
+    // ---- 窗口拖动 ----
 
-    // 窗口拖动
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);

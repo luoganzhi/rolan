@@ -190,6 +190,28 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public async Task ImportDataAsync(string filePath)
+    {
+        var exportService = new DataExportService();
+        var groups = await exportService.ImportAsync(filePath);
+
+        foreach (var group in groups)
+        {
+            var existingIds = Groups.Select(g => g.Id).ToHashSet();
+            group.Id = Groups.Count > 0 ? Groups.Max(g => g.Id) + 1 : 1;
+
+            await _dataService.SaveGroupAsync(group);
+            Groups.Add(group);
+
+            foreach (var item in group.Items)
+            {
+                item.Id = 0;
+                item.GroupId = group.Id;
+                await _dataService.SaveItemAsync(item);
+            }
+        }
+    }
+
     private static ShortcutType DetectType(string path)
     {
         if (path.StartsWith("http://") || path.StartsWith("https://"))

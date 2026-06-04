@@ -110,18 +110,11 @@ public partial class SettingsViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            var exportService = new DataExportService();
             try
             {
-                var groups = await exportService.ImportAsync(dialog.FileName);
-                // 清除现有数据
-                foreach (var group in _mainVm.Groups.ToList())
-                {
-                    foreach (var item in group.Items.ToList())
-                        await _mainVm.GetType().GetMethod("DeleteShortcutCommand")?.Invoke(_mainVm, new[] { item })!;
-                    await _mainVm.GetType().GetMethod("DeleteGroupCommand")?.Invoke(_mainVm, new[] { group })!;
-                }
-                System.Windows.MessageBox.Show("导入功能需要在重启后完全生效。请重启 Rolan。", "Rolan");
+                var exportService = new DataExportService();
+                await _mainVm.ImportDataAsync(dialog.FileName);
+                System.Windows.MessageBox.Show("导入成功！请重启 Rolan 以应用更改。", "Rolan");
             }
             catch (Exception ex)
             {

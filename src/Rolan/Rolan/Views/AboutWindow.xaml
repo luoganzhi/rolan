@@ -1,0 +1,22 @@
+<Window x:Class="Rolan.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="关于 Rolan"
+        Width="320"
+        Height="220"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="ToolWindow">
+    <Grid Background="#F5F5F5">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="Rolan" FontSize="24" FontWeight="Bold"
+                       HorizontalAlignment="Center" Foreground="#333" />
+            <TextBlock Text="桌面快捷方式管理器" FontSize="13"
+                       HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="#666" />
+            <TextBlock Text="v1.0.0" FontSize="11"
+                       HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="#999" />
+            <TextBlock Text="复刻 Windows Rolan 经典体验" FontSize="11"
+                       HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="#999" />
+        </StackPanel>
+    </Grid>
+</Window>

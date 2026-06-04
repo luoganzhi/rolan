@@ -22,3 +22,5 @@ Thumbs.db
 
 # Build
 *.nupkg
+.omc/
+.claude/

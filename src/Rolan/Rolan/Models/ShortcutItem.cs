@@ -48,4 +48,7 @@ public partial class ShortcutItem : ObservableObject
 
     [ObservableProperty]
     private DateTime? _lastLaunchedAt;
+
+    [ObservableProperty]
+    private string? _groupName;
 }

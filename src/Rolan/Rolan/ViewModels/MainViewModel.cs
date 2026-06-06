@@ -73,6 +73,7 @@ public partial class MainViewModel : ObservableObject
         {
             var groups = await _dataService.LoadAllAsync();
             Groups = new ObservableCollection<ShortcutGroup>(groups);
+            SyncAllGroupNames();
 
             if (Groups.Count == 0)
             {
@@ -389,6 +390,7 @@ public partial class MainViewModel : ObservableObject
                         : itemDefinition.Name.Trim(),
                     TargetPath = targetPath,
                     Type = type,
+                    GroupName = group.Name,
                     Order = itemIndex
                 };
                 await _dataService.SaveItemAsync(item);
@@ -493,7 +495,9 @@ public partial class MainViewModel : ObservableObject
             return;
 
         group.Name = groupName;
+        SyncGroupItemNames(group);
         await _dataService.SaveGroupAsync(group);
+        RefreshFilteredItems();
     }
 
     private string GenerateDefaultGroupName()
@@ -561,6 +565,7 @@ public partial class MainViewModel : ObservableObject
             Name = GetShortcutName(targetPath, type),
             TargetPath = targetPath,
             Type = type,
+            GroupName = SelectedGroup.Name,
             Order = SelectedGroup.Items.Any() ? SelectedGroup.Items.Max(i => i.Order) + 1 : 0
         };
 
@@ -751,6 +756,7 @@ public partial class MainViewModel : ObservableObject
             targetIndex = targetItems.Count;
 
         movedItem.GroupId = targetGroup.Id;
+        movedItem.GroupName = targetGroup.Name;
         targetItems.Insert(targetIndex, movedItem);
         targetGroup.Items = targetItems;
 
@@ -774,6 +780,7 @@ public partial class MainViewModel : ObservableObject
         targetItems.RemoveAll(i => i.Id == item.Id);
 
         item.GroupId = targetGroup.Id;
+        item.GroupName = targetGroup.Name;
         targetItems.Add(item);
         targetGroup.Items = targetItems;
 
@@ -819,6 +826,7 @@ public partial class MainViewModel : ObservableObject
             {
                 item.Id = 0;
                 item.GroupId = group.Id;
+                item.GroupName = group.Name;
                 await _dataService.SaveItemAsync(item);
             }
         }
@@ -1033,6 +1041,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         group.Items = items;
+        SyncGroupItemNames(group);
     }
 
     private void MoveShortcutSelection(int offset)
@@ -1084,4 +1093,16 @@ public partial class MainViewModel : ObservableObject
     private sealed record DefaultGroupDefinition(string Name, List<DefaultShortcutDefinition> Items);
 
     private sealed record DefaultShortcutDefinition(string Name, string TargetPath);
+
+    private void SyncAllGroupNames()
+    {
+        foreach (var group in Groups)
+            SyncGroupItemNames(group);
+    }
+
+    private static void SyncGroupItemNames(ShortcutGroup group)
+    {
+        foreach (var item in group.Items)
+            item.GroupName = group.Name;
+    }
 }

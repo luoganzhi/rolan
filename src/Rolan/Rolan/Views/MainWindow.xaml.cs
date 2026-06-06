@@ -633,6 +633,18 @@ public partial class MainWindow : Window
             OpenFileLocation(item);
     }
 
+    private void OnCopyTargetPath(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
+            CopyTextToClipboard(item.TargetPath);
+    }
+
+    private void OnCopyCommandLine(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
+            CopyTextToClipboard(BuildCommandLine(item));
+    }
+
     private void OnDuplicateShortcut(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
@@ -930,6 +942,61 @@ public partial class MainWindow : Window
             owner = ItemsControl.ItemsControlFromItemContainer(parentMenu);
 
         return owner as ContextMenu;
+    }
+
+    private static void CopyTextToClipboard(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        try
+        {
+            System.Windows.Clipboard.SetText(text);
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show($"无法写入剪贴板：{ex.Message}", "Rolan",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+        }
+    }
+
+    private static string BuildCommandLine(ShortcutItem item)
+    {
+        var target = QuoteForCommandLine(item.TargetPath);
+        return string.IsNullOrWhiteSpace(item.Arguments)
+            ? target
+            : $"{target} {item.Arguments!.Trim()}";
+    }
+
+    private static string QuoteForCommandLine(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0 ||
+            trimmed.StartsWith("rolan:", StringComparison.OrdinalIgnoreCase) ||
+            TargetPathHelper.IsUrl(trimmed))
+        {
+            return trimmed;
+        }
+
+        if (trimmed.StartsWith('"') && trimmed.EndsWith('"'))
+            return trimmed;
+
+        var resolved = TryResolveForCommandLine(trimmed);
+        return trimmed.Any(char.IsWhiteSpace) || resolved?.Any(char.IsWhiteSpace) == true
+            ? $"\"{trimmed}\""
+            : trimmed;
+    }
+
+    private static string? TryResolveForCommandLine(string value)
+    {
+        try
+        {
+            return TargetPathHelper.Resolve(value);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private readonly record struct HotkeyRegistration(bool Success, int Modifiers, int Key, bool UsedFallback);

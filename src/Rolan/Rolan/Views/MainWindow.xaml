@@ -148,7 +148,10 @@
                         <MenuItem Header="打开" Click="OnOpenShortcut" />
                         <MenuItem Header="打开文件位置" Click="OnOpenFileLocation" />
                         <Separator />
-                        <MenuItem Header="复制" Click="OnDuplicateShortcut" />
+                        <MenuItem Header="复制目标" Click="OnCopyTargetPath" />
+                        <MenuItem Header="复制命令行" Click="OnCopyCommandLine" />
+                        <Separator />
+                        <MenuItem Header="创建副本" Click="OnDuplicateShortcut" />
                         <Separator />
                         <MenuItem Header="上移" Click="OnMoveUp" />
                         <MenuItem Header="下移" Click="OnMoveDown" />

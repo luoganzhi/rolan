@@ -674,14 +674,37 @@ public partial class MainWindow : Window
 
     private void OnDeleteGroup(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem mi || ResolveGroupItem(mi) is not ShortcutGroup group) return;
+        if (sender is not MenuItem mi || ResolveGroupItem(mi) is not ShortcutGroup group || ViewModel is not { } vm) return;
 
-        using (ViewModel?.PanelService.SuspendAutoHide())
+        var targetGroup = vm.Groups
+            .Where(candidate => candidate.Id != group.Id)
+            .OrderBy(candidate => candidate.Order)
+            .FirstOrDefault();
+
+        using (vm.PanelService.SuspendAutoHide())
         {
-            if (System.Windows.MessageBox.Show($"确认删除分组 \"{group.Name}\" 及其所有快捷方式？",
-                    "Rolan", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning) == System.Windows.MessageBoxResult.Yes)
+            var hasItems = group.Items.Count > 0;
+            var message = hasItems && targetGroup != null
+                ? $"删除分组 \"{group.Name}\"？\n\n选择“是”会先把其中 {group.Items.Count} 个快捷方式移动到 \"{targetGroup.Name}\"。\n选择“否”会连同其中所有快捷方式一起删除。"
+                : $"确认删除分组 \"{group.Name}\" 及其所有快捷方式？";
+
+            var buttons = hasItems && targetGroup != null
+                ? System.Windows.MessageBoxButton.YesNoCancel
+                : System.Windows.MessageBoxButton.YesNo;
+
+            var result = System.Windows.MessageBox.Show(message,
+                "Rolan", buttons, System.Windows.MessageBoxImage.Warning);
+            if (result is System.Windows.MessageBoxResult.Cancel or System.Windows.MessageBoxResult.None)
+                return;
+
+            if (hasItems && targetGroup != null && result == System.Windows.MessageBoxResult.Yes)
             {
-                ViewModel?.DeleteGroupCommand.Execute(group);
+                vm.DeleteGroupCommand.Execute(
+                    new MainViewModel.DeleteGroupRequest(group, targetGroup));
+            }
+            else
+            {
+                vm.DeleteGroupCommand.Execute(new MainViewModel.DeleteGroupRequest(group, null));
             }
         }
     }

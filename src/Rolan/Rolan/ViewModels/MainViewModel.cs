@@ -463,8 +463,9 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task DeleteGroup(ShortcutGroup? group)
+    private async Task DeleteGroup(DeleteGroupRequest? request)
     {
+        var group = request?.Group;
         if (group == null) return;
         if (Groups.Count <= 1)
         {
@@ -473,9 +474,18 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        if (request?.TargetGroup != null)
+        {
+            await MoveAllShortcutsToGroupAsync(group, request.TargetGroup);
+        }
+
         await _dataService.DeleteGroupAsync(group.Id);
         Groups.Remove(group);
-        SelectedGroup = Groups.FirstOrDefault();
+        SelectedGroup = request?.TargetGroup != null && Groups.Contains(request.TargetGroup)
+            ? request.TargetGroup
+            : Groups.FirstOrDefault();
+        SelectedShortcut = SelectedGroup?.Items.OrderBy(i => i.Order).FirstOrDefault();
+        RefreshFilteredItems();
     }
 
     [RelayCommand]
@@ -541,6 +551,26 @@ public partial class MainViewModel : ObservableObject
             System.Windows.MessageBox.Show(message, "Rolan",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
+    }
+
+    private async Task MoveAllShortcutsToGroupAsync(ShortcutGroup sourceGroup, ShortcutGroup targetGroup)
+    {
+        if (sourceGroup.Id == targetGroup.Id || sourceGroup.Items.Count == 0)
+            return;
+
+        var movedItems = sourceGroup.Items.OrderBy(item => item.Order).ToList();
+        var targetItems = targetGroup.Items.OrderBy(item => item.Order).ToList();
+        targetItems.AddRange(movedItems);
+
+        foreach (var item in movedItems)
+        {
+            item.GroupId = targetGroup.Id;
+            item.GroupName = targetGroup.Name;
+        }
+
+        targetGroup.Items = targetItems;
+        sourceGroup.Items.Clear();
+        await SaveItemOrderAsync(targetGroup);
     }
 
     [RelayCommand]
@@ -1093,6 +1123,8 @@ public partial class MainViewModel : ObservableObject
     private sealed record DefaultGroupDefinition(string Name, List<DefaultShortcutDefinition> Items);
 
     private sealed record DefaultShortcutDefinition(string Name, string TargetPath);
+
+    public sealed record DeleteGroupRequest(ShortcutGroup Group, ShortcutGroup? TargetGroup);
 
     private void SyncAllGroupNames()
     {

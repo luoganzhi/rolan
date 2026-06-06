@@ -162,6 +162,7 @@
                         </MenuItem>
                         <Separator />
                         <MenuItem Header="编辑..." Click="OnEditShortcut" />
+                        <MenuItem Header="重置使用记录" Click="OnResetShortcutStats" />
                         <MenuItem Header="删除" Click="OnDeleteShortcut" />
                     </ContextMenu>
                 </Border.ContextMenu>

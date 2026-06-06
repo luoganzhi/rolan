@@ -725,6 +725,18 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ResetShortcutStats(ShortcutItem? item)
+    {
+        if (item == null) return;
+        if (item.LaunchCount == 0 && item.LastLaunchedAt == null) return;
+
+        item.LaunchCount = 0;
+        item.LastLaunchedAt = null;
+        await _dataService.SaveItemAsync(item);
+        RefreshFilteredItems();
+    }
+
+    [RelayCommand]
     private void OpenSettings()
     {
         var settingsWindow = new Views.SettingsWindow();

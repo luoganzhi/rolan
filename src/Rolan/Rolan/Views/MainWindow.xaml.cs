@@ -601,6 +601,11 @@ public partial class MainWindow : Window
         if (moveDownMenu != null)
             moveDownMenu.IsEnabled = itemIndex >= 0 && itemIndex < orderedItems.Count - 1;
 
+        var resetStatsMenu = menu.Items.OfType<MenuItem>()
+            .FirstOrDefault(mi => string.Equals(mi.Header as string, "重置使用记录", StringComparison.Ordinal));
+        if (resetStatsMenu != null)
+            resetStatsMenu.IsEnabled = item.LaunchCount > 0 || item.LastLaunchedAt != null;
+
         var moveMenu = menu.Items.OfType<MenuItem>()
             .FirstOrDefault(mi => string.Equals(mi.Header as string, "移动到分组", StringComparison.Ordinal));
 
@@ -638,6 +643,12 @@ public partial class MainWindow : Window
     {
         if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
             await EditShortcutAsync(item);
+    }
+
+    private void OnResetShortcutStats(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
+            ViewModel?.ResetShortcutStatsCommand.Execute(item);
     }
 
     private void OnDeleteShortcut(object sender, RoutedEventArgs e)

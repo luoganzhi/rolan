@@ -634,6 +634,50 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task DuplicateShortcut(ShortcutItem? item)
+    {
+        if (item == null) return;
+
+        var sourceGroup = Groups.FirstOrDefault(group => group.Id == item.GroupId);
+        if (sourceGroup == null) return;
+
+        var copy = new ShortcutItem
+        {
+            GroupId = sourceGroup.Id,
+            GroupName = sourceGroup.Name,
+            Name = GenerateDuplicateShortcutName(sourceGroup, item.Name),
+            TargetPath = item.TargetPath,
+            Arguments = item.Arguments,
+            WorkingDirectory = item.WorkingDirectory,
+            IconData = item.IconData?.ToArray(),
+            Type = item.Type,
+            CreatedAt = DateTime.Now,
+            Order = sourceGroup.Items.Any() ? sourceGroup.Items.Max(shortcut => shortcut.Order) + 1 : 0
+        };
+
+        await _dataService.SaveItemAsync(copy);
+        sourceGroup.Items.Add(copy);
+        SelectedGroup = sourceGroup;
+        SelectedShortcut = copy;
+        RefreshFilteredItems();
+    }
+
+    private static string GenerateDuplicateShortcutName(ShortcutGroup group, string name)
+    {
+        var baseName = string.IsNullOrWhiteSpace(name) ? "快捷方式" : name.Trim();
+        var copyName = $"{baseName} - 副本";
+        if (group.Items.All(item => !string.Equals(item.Name, copyName, StringComparison.OrdinalIgnoreCase)))
+            return copyName;
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseName} - 副本 {index}";
+            if (group.Items.All(item => !string.Equals(item.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+                return candidate;
+        }
+    }
+
+    [RelayCommand]
     private void OpenSettings()
     {
         var settingsWindow = new Views.SettingsWindow();

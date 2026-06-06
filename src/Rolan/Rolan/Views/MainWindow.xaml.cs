@@ -319,6 +319,7 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.F2 ||
             e.Key == Key.Delete && (allowPlainDelete || Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) ||
+            e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ||
             e.Key == Key.O && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             e.Handled = true;
@@ -352,6 +353,10 @@ public partial class MainWindow : Window
             case Key.O when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
                 e.Handled = true;
                 OpenFileLocation(item);
+                break;
+            case Key.D when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
+                e.Handled = true;
+                ViewModel?.DuplicateShortcutCommand.Execute(item);
                 break;
         }
     }
@@ -621,6 +626,12 @@ public partial class MainWindow : Window
     {
         if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
             OpenFileLocation(item);
+    }
+
+    private void OnDuplicateShortcut(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && ResolveShortcutItem(mi) is ShortcutItem item)
+            ViewModel?.DuplicateShortcutCommand.Execute(item);
     }
 
     private async void OnEditShortcut(object sender, RoutedEventArgs e)

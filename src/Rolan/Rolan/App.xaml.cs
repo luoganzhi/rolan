@@ -1,17 +1,29 @@
 using System.Drawing;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+using Rolan.Helpers;
 using Rolan.Services;
 using Rolan.ViewModels;
 using Rolan.Views;
 
 namespace Rolan;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
+    private const string SingleInstanceMutexName = "Rolan.DesktopShortcutManager.SingleInstance";
+    private const string ShowMainWindowEventName = "Rolan.DesktopShortcutManager.ShowMainWindow";
+
     private readonly IServiceProvider _services;
     private NotifyIcon? _notifyIcon;
+    private ToolStripMenuItem? _toggleWindowMenuItem;
     private MainWindow? _mainWindow;
     private MainViewModel? _mainVm;
+    private System.Threading.Mutex? _singleInstanceMutex;
+    private EventWaitHandle? _showMainWindowEvent;
+    private Thread? _showMainWindowThread;
+    private volatile bool _isExiting;
 
     public App()
     {
@@ -39,6 +51,19 @@ public partial class App : Application
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
+        _singleInstanceMutex = new System.Threading.Mutex(true, SingleInstanceMutexName, out var createdNew);
+        if (!createdNew)
+        {
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+            SignalRunningInstance();
+            Shutdown();
+            return;
+        }
+
+        _showMainWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowMainWindowEventName);
+        StartShowMainWindowListener();
+
         _mainVm = _services.GetRequiredService<MainViewModel>();
         _mainWindow = _services.GetRequiredService<MainWindow>();
         _mainWindow.DataContext = _mainVm;
@@ -46,9 +71,13 @@ public partial class App : Application
         // 处理窗口关闭（最小化到托盘）
         _mainWindow.Closing += OnMainWindowClosing;
         _mainWindow.IsVisibleChanged += (_, _) => UpdateTrayMenuText();
+        _mainVm.PanelService.VisibilityChanged += UpdateTrayMenuText;
+
+        CreateTrayIcon();
+        if (ShouldStartMinimized(e.Args))
+            _mainWindow.Loaded += HideMainWindowAfterStartup;
 
         _mainWindow.Show();
-        CreateTrayIcon();
     }
 
     // ---- 系统托盘 ----
@@ -66,17 +95,22 @@ public partial class App : Application
 
         var menu = new ContextMenuStrip();
 
-        menu.Items.Add("显示/隐藏", null, (_, _) => ToggleMainWindow());
+        _toggleWindowMenuItem = new ToolStripMenuItem("显示面板", null, (_, _) => ToggleMainWindow())
+        {
+            Font = new Font(System.Drawing.SystemFonts.MenuFont ?? Control.DefaultFont, System.Drawing.FontStyle.Bold)
+        };
+        menu.Items.Add(_toggleWindowMenuItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("添加分组", null, (_, _) =>
         {
-            _mainWindow?.Show();
-            _mainVm?.AddGroupCommand.Execute(null);
+            ShowMainWindow();
+            _ = _mainWindow?.AddGroupWithNameAsync();
         });
+        menu.Items.Add("打开数据目录", null, (_, _) => OpenDataDirectory());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("设置", null, (_, _) =>
         {
-            _mainWindow?.Show();
+            ShowMainWindow();
             _mainVm?.OpenSettingsCommand.Execute(null);
         });
         menu.Items.Add("关于", null, (_, _) =>
@@ -88,19 +122,36 @@ public partial class App : Application
         menu.Items.Add("退出", null, (_, _) => ExitApplication());
 
         _notifyIcon.ContextMenuStrip = menu;
+        UpdateTrayMenuText();
     }
 
     private void ToggleMainWindow()
     {
         if (_mainWindow == null) return;
 
-        if (_mainWindow.IsVisible && _mainWindow.IsActive)
+        if (_mainWindow.IsVisible && _mainWindow.IsActive && _mainVm?.PanelService.IsHidden != true)
+        {
             _mainWindow.Hide();
+        }
         else
         {
-            _mainWindow.Show();
-            _mainWindow.Activate();
+            ShowMainWindow();
         }
+    }
+
+    private void ShowMainWindowFromExternalSignal()
+        => ShowMainWindow();
+
+    private void ShowMainWindow()
+    {
+        if (_mainWindow == null) return;
+
+        _mainWindow.Show();
+        _mainWindow.Activate();
+        if (_mainVm?.PanelService.IsHidden == true)
+            _mainVm.PanelService.AnimateShow();
+        _mainWindow.FocusSearchBox();
+        UpdateTrayMenuText();
     }
 
     private void OnMainWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -110,15 +161,48 @@ public partial class App : Application
         _mainWindow?.Hide();
     }
 
+    private void HideMainWindowAfterStartup(object sender, RoutedEventArgs e)
+    {
+        if (_mainWindow == null) return;
+
+        _mainWindow.Loaded -= HideMainWindowAfterStartup;
+        _mainWindow.Hide();
+        UpdateTrayMenuText();
+    }
+
     private void UpdateTrayMenuText()
     {
-        // 可扩展
+        if (_toggleWindowMenuItem == null || _mainWindow == null)
+            return;
+
+        if (!_mainWindow.IsVisible)
+            _toggleWindowMenuItem.Text = "显示面板";
+        else if (_mainVm?.PanelService.IsHidden == true)
+            _toggleWindowMenuItem.Text = "恢复面板";
+        else
+            _toggleWindowMenuItem.Text = "隐藏面板";
+    }
+
+    private static void OpenDataDirectory()
+    {
+        var dataDirectory = AppStorage.GetDataDirectory();
+        Directory.CreateDirectory(dataDirectory);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = dataDirectory,
+            UseShellExecute = true
+        });
     }
 
     private void ExitApplication()
     {
+        _isExiting = true;
+        _showMainWindowEvent?.Set();
         _notifyIcon?.Dispose();
         _notifyIcon = null;
+
+        if (_mainVm != null)
+            _mainVm.PanelService.VisibilityChanged -= UpdateTrayMenuText;
 
         if (_mainWindow != null)
         {
@@ -131,7 +215,59 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _isExiting = true;
+        _showMainWindowEvent?.Set();
         _notifyIcon?.Dispose();
+        if (_mainVm != null)
+            _mainVm.PanelService.VisibilityChanged -= UpdateTrayMenuText;
+        _showMainWindowThread?.Join(TimeSpan.FromMilliseconds(500));
+        _showMainWindowEvent?.Dispose();
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+        }
+        catch (ApplicationException)
+        {
+        }
+
+        _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
+
+    private static void SignalRunningInstance()
+    {
+        try
+        {
+            using var showEvent = EventWaitHandle.OpenExisting(ShowMainWindowEventName);
+            showEvent.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            System.Windows.MessageBox.Show("Rolan 已在运行。", "Rolan",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private void StartShowMainWindowListener()
+    {
+        _showMainWindowThread = new Thread(() =>
+        {
+            while (!_isExiting)
+            {
+                _showMainWindowEvent?.WaitOne();
+                if (_isExiting)
+                    break;
+
+                Dispatcher.BeginInvoke(ShowMainWindowFromExternalSignal);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Rolan single-instance listener"
+        };
+        _showMainWindowThread.Start();
+    }
+
+    private static bool ShouldStartMinimized(IEnumerable<string> args)
+        => args.Any(arg => string.Equals(arg, AutoStartService.MinimizedArgument, StringComparison.OrdinalIgnoreCase));
 }

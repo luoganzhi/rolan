@@ -4,6 +4,6 @@ namespace Rolan.Services;
 
 public interface IShellService
 {
-    void Launch(string targetPath, string? arguments = null, string? workingDirectory = null);
+    bool Launch(string targetPath, string? arguments = null, string? workingDirectory = null);
     BitmapSource? ExtractIcon(string filePath);
 }

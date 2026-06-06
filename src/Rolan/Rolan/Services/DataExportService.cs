@@ -1,4 +1,6 @@
+using System.IO;
 using System.Text.Json;
+using Rolan.Helpers;
 using Rolan.Models;
 
 namespace Rolan.Services;
@@ -33,7 +35,9 @@ public class DataExportService : IDataExportService
                         IconData = i.IconData,
                         Order = i.Order,
                         Type = i.Type,
-                        CreatedAt = i.CreatedAt
+                        CreatedAt = i.CreatedAt,
+                        LaunchCount = i.LaunchCount,
+                        LastLaunchedAt = i.LastLaunchedAt
                     })
                     .ToList()
             })
@@ -70,17 +74,51 @@ public class DataExportService : IDataExportService
             throw new InvalidDataException("导入文件格式错误");
 
         // 重置 ID，以便重新插入
+        var groupOrder = 0;
         foreach (var group in data.Groups)
         {
             group.Id = 0;
-            foreach (var item in group.Items)
+            group.Name = string.IsNullOrWhiteSpace(group.Name) ? $"导入分组 {groupOrder + 1}" : group.Name.Trim();
+            group.Order = groupOrder++;
+            group.Items ??= new List<ShortcutItem>();
+
+            var itemOrder = 0;
+            foreach (var item in group.Items.ToList())
             {
+                item.TargetPath = TargetPathHelper.NormalizeInput(item.TargetPath) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(item.TargetPath))
+                {
+                    group.Items.Remove(item);
+                    continue;
+                }
+
                 item.Id = 0;
                 item.GroupId = 0;
+                item.Name = string.IsNullOrWhiteSpace(item.Name)
+                    ? Path.GetFileNameWithoutExtension(item.TargetPath)
+                    : item.Name.Trim();
+                if (string.IsNullOrWhiteSpace(item.Name))
+                    item.Name = item.TargetPath;
+
+                item.Arguments = NullIfWhiteSpace(item.Arguments);
+                item.WorkingDirectory = NullIfWhiteSpace(item.WorkingDirectory);
+                item.Order = itemOrder++;
+                if (item.CreatedAt == default)
+                    item.CreatedAt = DateTime.Now;
+                if (item.LaunchCount < 0)
+                    item.LaunchCount = 0;
+                if (item.LastLaunchedAt == default)
+                    item.LastLaunchedAt = null;
             }
         }
 
         return data.Groups;
+    }
+
+    private static string? NullIfWhiteSpace(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 
     private class ExportData

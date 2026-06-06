@@ -1,6 +1,8 @@
 # .NET
 bin/
 obj/
+.dotnet/
+.dotnet-install.ps1
 *.user
 *.suo
 *.cache
@@ -9,6 +11,8 @@ obj/
 # Data
 /data/
 *.db
+*.db-journal
+tmp-rolan-default-check*/
 
 # IDE
 .idea/
@@ -22,5 +26,6 @@ Thumbs.db
 
 # Build
 *.nupkg
+publish-rolan/
 .omc/
 .claude/

@@ -8,14 +8,20 @@
         Background="Transparent"
         ShowInTaskbar="False"
         Topmost="True"
-        ResizeMode="NoResize"
+        ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="Manual"
-        Width="320"
-        Height="600"
+        Width="360"
+        Height="720"
+        MinWidth="280"
+        MinHeight="420"
+        PreviewKeyDown="OnWindowPreviewKeyDown"
+        PreviewTextInput="OnWindowPreviewTextInput"
         Title="Rolan">
     <Window.Resources>
         <cvt:IconToImageConverter x:Key="IconConverter" />
         <cvt:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <cvt:NullToVisibilityConverter x:Key="NullToVis" />
+        <cvt:ShortcutTypeToGlyphConverter x:Key="ShortcutTypeGlyph" />
 
         <!-- 分组标签样式 -->
         <Style x:Key="GroupTabItem" TargetType="ListBoxItem">
@@ -25,6 +31,11 @@
             <Setter Property="Margin" Value="2,2" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="AllowDrop" Value="True" />
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnGroupPreviewMouseLeftButtonDown" />
+            <EventSetter Event="MouseMove" Handler="OnGroupMouseMove" />
+            <EventSetter Event="DragOver" Handler="OnGroupDragOver" />
+            <EventSetter Event="Drop" Handler="OnGroupDrop" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -56,6 +67,39 @@
             </Setter>
         </Style>
 
+        <Style x:Key="ShortcutListBoxItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="SelectionBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Margin="1">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SelectionBorder" Property="Background" Value="#22006DCC" />
+                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="#66006DCC" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SelectionBorder" Property="Background" Value="#14006DCC" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- 快捷方式项模板 -->
         <DataTemplate x:Key="ShortcutItemTemplate" DataType="models:ShortcutItem">
             <Border Width="72" Height="Auto"
@@ -63,20 +107,26 @@
                     Background="Transparent"
                     Cursor="Hand"
                     ToolTip="{Binding TargetPath}"
-                    MouseDown="OnShortcutMouseDown">
+                    AllowDrop="True"
+                    PreviewMouseLeftButtonDown="OnShortcutPreviewMouseLeftButtonDown"
+                    MouseMove="OnShortcutMouseMove"
+                    MouseLeftButtonUp="OnShortcutMouseLeftButtonUp"
+                    DragOver="OnShortcutDragOver"
+                    Drop="OnShortcutDrop">
                 <Border.ContextMenu>
-                    <ContextMenu>
+                    <ContextMenu Opened="OnShortcutContextMenuOpened">
                         <MenuItem Header="打开" Click="OnOpenShortcut" />
                         <MenuItem Header="打开文件位置" Click="OnOpenFileLocation" />
                         <Separator />
                         <MenuItem Header="上移" Click="OnMoveUp" />
                         <MenuItem Header="下移" Click="OnMoveDown" />
-                        <MenuItem Header="移动到分组" ItemsSource="{Binding Source={RelativeSource AncestorType=Window}, Path=DataContext.Groups}">
-                            <MenuItem.ItemTemplate>
-                                <DataTemplate DataType="models:ShortcutGroup">
-                                    <MenuItem Header="{Binding Name}" Click="OnMoveToGroup" />
-                                </DataTemplate>
-                            </MenuItem.ItemTemplate>
+                        <MenuItem Header="移动到分组">
+                            <MenuItem.ItemContainerStyle>
+                                <Style TargetType="{x:Type MenuItem}">
+                                    <Setter Property="Header" Value="{Binding Name}" />
+                                    <EventSetter Event="Click" Handler="OnMoveToGroup" />
+                                </Style>
+                            </MenuItem.ItemContainerStyle>
                         </MenuItem>
                         <Separator />
                         <MenuItem Header="编辑..." Click="OnEditShortcut" />
@@ -90,10 +140,19 @@
                             BorderBrush="#CCC"
                             BorderThickness="1"
                             HorizontalAlignment="Center">
-                        <Image Source="{Binding IconData, Converter={StaticResource IconConverter}}"
-                               Width="32" Height="32"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
+                        <Grid>
+                            <TextBlock Text="{Binding Type, Converter={StaticResource ShortcutTypeGlyph}}"
+                                       Visibility="{Binding IconData, Converter={StaticResource NullToVis}}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="#607080"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                            <Image Source="{Binding IconData, Converter={StaticResource IconConverter}}"
+                                   Width="32" Height="32"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                        </Grid>
                     </Border>
                     <TextBlock Text="{Binding Name}"
                                FontSize="10"
@@ -116,9 +175,10 @@
             Margin="4"
             MouseEnter="OnPanelMouseEnter"
             MouseLeave="OnPanelMouseLeave"
-            AllowDrop="True"
-            Drop="OnDrop"
-            DragEnter="OnDragEnter">
+                    AllowDrop="True"
+                    Drop="OnDrop"
+                    DragEnter="OnDragEnter"
+                    DragOver="OnDragOver">
         <Border.Effect>
             <DropShadowEffect BlurRadius="12" Opacity="0.25" ShadowDepth="2" Color="Black"/>
         </Border.Effect>
@@ -128,7 +188,8 @@
             <Border DockPanel.Dock="Top"
                     Background="#E8E8E8"
                     CornerRadius="8,8,0,0"
-                    Height="34">
+                    Height="34"
+                    MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
                 <DockPanel>
                     <TextBlock Text="Rolan"
                                FontSize="13" FontWeight="SemiBold"
@@ -144,8 +205,8 @@
                                 BorderThickness="0"
                                 FontSize="16" Cursor="Hand"
                                 Foreground="#555"
-                                Click="OnBrowseAdd"
-                                ToolTip="浏览添加文件" />
+                                Click="OnAddMenuClick"
+                                ToolTip="添加快捷方式" />
                         <Button Content="⚙"
                                 Width="28" Height="28"
                                 Background="Transparent"
@@ -171,13 +232,15 @@
                     Background="#E0E0E0"
                     Padding="8,4"
                     Height="30">
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox x:Name="SearchBox"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                          FontSize="12"
                          Padding="4,0"
                          Background="White"
                          BorderBrush="#C0C0C0"
                          BorderThickness="1"
                          VerticalContentAlignment="Center"
+                         KeyDown="OnSearchKeyDown"
                          ToolTip="搜索快捷方式..." />
             </Border>
 
@@ -229,24 +292,38 @@
                        Foreground="#AAA"
                        HorizontalAlignment="Center"
                        Margin="0,20,0,0"
-                       Visibility="Collapsed" />
+                       Visibility="{Binding HasNoFilteredItems, Converter={StaticResource BoolToVis}}" />
+
+            <ResizeGrip DockPanel.Dock="Bottom"
+                        Width="16"
+                        Height="16"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,6,6" />
 
             <!-- 快捷方式网格 -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Padding="4"
-                          Background="Transparent"
-                          AllowDrop="True">
-                <ItemsControl x:Name="ShortcutGrid"
-                              ItemsSource="{Binding FilteredItems}"
-                              ItemTemplate="{StaticResource ShortcutItemTemplate}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-            </ScrollViewer>
+            <ListBox x:Name="ShortcutGrid"
+                     ItemsSource="{Binding FilteredItems}"
+                     SelectedItem="{Binding SelectedShortcut, Mode=TwoWay}"
+                     ItemTemplate="{StaticResource ShortcutItemTemplate}"
+                     ItemContainerStyle="{StaticResource ShortcutListBoxItem}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Padding="4"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="False"
+                     AllowDrop="True"
+                     DragOver="OnDragOver"
+                     Drop="OnDrop"
+                     SelectionChanged="OnShortcutGridSelectionChanged"
+                     KeyDown="OnShortcutGridKeyDown">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+            </ListBox>
         </DockPanel>
     </Border>
 </Window>

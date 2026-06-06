@@ -1,4 +1,6 @@
+using System.IO;
 using Microsoft.Data.Sqlite;
+using Rolan.Helpers;
 using Rolan.Models;
 
 namespace Rolan.Services;
@@ -9,7 +11,7 @@ public class DataService : IDataService
 
     public DataService()
     {
-        var dbDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Rolan");
+        var dbDir = AppStorage.GetDataDirectory();
         Directory.CreateDirectory(dbDir);
         var dbPath = Path.Combine(dbDir, "data.db");
         _connectionString = $"Data Source={dbPath}";
@@ -42,12 +44,32 @@ public class DataService : IDataService
                 SortOrder INTEGER NOT NULL DEFAULT 0,
                 Type INTEGER NOT NULL DEFAULT 0,
                 CreatedAt TEXT NOT NULL,
+                LaunchCount INTEGER NOT NULL DEFAULT 0,
+                LastLaunchedAt TEXT,
                 FOREIGN KEY (GroupId) REFERENCES Groups(Id) ON DELETE CASCADE
             );
 
             CREATE INDEX IF NOT EXISTS IX_Items_GroupId ON ShortcutItems(GroupId);
             """;
         cmd.ExecuteNonQuery();
+        EnsureShortcutItemColumn(conn, "LaunchCount", "INTEGER NOT NULL DEFAULT 0");
+        EnsureShortcutItemColumn(conn, "LastLaunchedAt", "TEXT");
+    }
+
+    private static void EnsureShortcutItemColumn(SqliteConnection conn, string columnName, string definition)
+    {
+        using var columnsCmd = conn.CreateCommand();
+        columnsCmd.CommandText = "PRAGMA table_info(ShortcutItems);";
+        using var reader = columnsCmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                return;
+        }
+
+        using var alterCmd = conn.CreateCommand();
+        alterCmd.CommandText = $"ALTER TABLE ShortcutItems ADD COLUMN {columnName} {definition};";
+        alterCmd.ExecuteNonQuery();
     }
 
     private static void EnableForeignKeys(SqliteConnection conn)
@@ -86,7 +108,7 @@ public class DataService : IDataService
             using var itemCmd = conn.CreateCommand();
             itemCmd.CommandText = """
                 SELECT Id, GroupId, Name, TargetPath, Arguments, WorkingDirectory,
-                       IconData, SortOrder, Type, CreatedAt
+                       IconData, SortOrder, Type, CreatedAt, LaunchCount, LastLaunchedAt
                 FROM ShortcutItems WHERE GroupId = @gid ORDER BY SortOrder
                 """;
             itemCmd.Parameters.AddWithValue("@gid", group.Id);
@@ -104,7 +126,9 @@ public class DataService : IDataService
                     IconData = itemReader.IsDBNull(6) ? null : (byte[])itemReader[6],
                     Order = itemReader.GetInt32(7),
                     Type = (ShortcutType)itemReader.GetInt32(8),
-                    CreatedAt = DateTime.Parse(itemReader.GetString(9))
+                    CreatedAt = DateTime.Parse(itemReader.GetString(9)),
+                    LaunchCount = itemReader.GetInt32(10),
+                    LastLaunchedAt = itemReader.IsDBNull(11) ? null : DateTime.Parse(itemReader.GetString(11))
                 });
             }
         }
@@ -162,8 +186,8 @@ public class DataService : IDataService
             using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 INSERT INTO ShortcutItems (GroupId, Name, TargetPath, Arguments, WorkingDirectory,
-                    IconData, SortOrder, Type, CreatedAt)
-                VALUES (@gid, @n, @t, @a, @wd, @i, @o, @type, @ca);
+                    IconData, SortOrder, Type, CreatedAt, LaunchCount, LastLaunchedAt)
+                VALUES (@gid, @n, @t, @a, @wd, @i, @o, @type, @ca, @lc, @lla);
                 SELECT last_insert_rowid();
                 """;
             cmd.Parameters.AddWithValue("@gid", item.GroupId);
@@ -175,6 +199,8 @@ public class DataService : IDataService
             cmd.Parameters.AddWithValue("@o", item.Order);
             cmd.Parameters.AddWithValue("@type", (int)item.Type);
             cmd.Parameters.AddWithValue("@ca", item.CreatedAt.ToString("O"));
+            cmd.Parameters.AddWithValue("@lc", item.LaunchCount);
+            cmd.Parameters.AddWithValue("@lla", item.LastLaunchedAt?.ToString("O") ?? (object)DBNull.Value);
             item.Id = Convert.ToInt32(await cmd.ExecuteScalarAsync());
         }
         else
@@ -183,7 +209,7 @@ public class DataService : IDataService
             cmd.CommandText = """
                 UPDATE ShortcutItems SET GroupId = @gid, Name = @n, TargetPath = @t,
                     Arguments = @a, WorkingDirectory = @wd, IconData = @i,
-                    SortOrder = @o, Type = @type
+                    SortOrder = @o, Type = @type, LaunchCount = @lc, LastLaunchedAt = @lla
                 WHERE Id = @id
                 """;
             cmd.Parameters.AddWithValue("@gid", item.GroupId);
@@ -194,6 +220,8 @@ public class DataService : IDataService
             cmd.Parameters.AddWithValue("@i", (object?)item.IconData ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@o", item.Order);
             cmd.Parameters.AddWithValue("@type", (int)item.Type);
+            cmd.Parameters.AddWithValue("@lc", item.LaunchCount);
+            cmd.Parameters.AddWithValue("@lla", item.LastLaunchedAt?.ToString("O") ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@id", item.Id);
             await cmd.ExecuteNonQueryAsync();
         }
@@ -231,6 +259,23 @@ public class DataService : IDataService
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE ShortcutItems SET SortOrder = @o WHERE Id = @id";
         cmd.Parameters.AddWithValue("@o", newOrder);
+        cmd.Parameters.AddWithValue("@id", itemId);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task RecordItemLaunchAsync(int itemId, int launchCount, DateTime lastLaunchedAt)
+    {
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync();
+        EnableForeignKeys(conn);
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE ShortcutItems
+            SET LaunchCount = @count, LastLaunchedAt = @last
+            WHERE Id = @id
+            """;
+        cmd.Parameters.AddWithValue("@count", launchCount);
+        cmd.Parameters.AddWithValue("@last", lastLaunchedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@id", itemId);
         await cmd.ExecuteNonQueryAsync();
     }

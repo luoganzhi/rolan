@@ -7,7 +7,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationIcon>Resources\Icons\app.ico</ApplicationIcon>
     <AssemblyName>Rolan</AssemblyName>
     <RootNamespace>Rolan</RootNamespace>
     <Version>1.0.0.0</Version>
@@ -15,10 +14,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.27" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.6" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\default_groups.json" />
+  </ItemGroup>
+
+  <Target Name="CreatePortablePublishLayout" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true'">
+    <RemoveDir Directories="$(PublishDir)data" />
+    <MakeDir Directories="$(PublishDir)data" />
+    <WriteLinesToFile File="$(PublishDir)portable.flag"
+                      Lines="Rolan portable mode. Keep this file next to Rolan.exe to store settings and data in .\data."
+                      Overwrite="true" />
+  </Target>
 
 </Project>

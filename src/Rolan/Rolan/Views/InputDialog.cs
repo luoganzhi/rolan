@@ -30,17 +30,20 @@ public partial class InputDialog : Window
         grid.Children.Add(promptText);
 
         // 输入框
-        var textBox = new TextBox { Text = defaultValue, FontSize = 12, Margin = new Thickness(0, 0, 0, 12) };
-        textBox.SelectAll();
-        textBox.Focus();
+        var textBox = new System.Windows.Controls.TextBox { Text = defaultValue, FontSize = 12, Margin = new Thickness(0, 0, 0, 12) };
+        Loaded += (_, _) =>
+        {
+            textBox.SelectAll();
+            textBox.Focus();
+        };
         Grid.SetRow(textBox, 1);
         grid.Children.Add(textBox);
 
         // 按钮
-        var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var okBtn = new Button { Content = "确定", Width = 70, Height = 26, Margin = new Thickness(0, 0, 8, 0) };
+        var btnPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
+        var okBtn = new System.Windows.Controls.Button { Content = "确定", Width = 70, Height = 26, Margin = new Thickness(0, 0, 8, 0) };
         okBtn.Click += (_, _) => { Result = textBox.Text; DialogResult = true; Close(); };
-        var cancelBtn = new Button { Content = "取消", Width = 70, Height = 26 };
+        var cancelBtn = new System.Windows.Controls.Button { Content = "取消", Width = 70, Height = 26 };
         cancelBtn.Click += (_, _) => { DialogResult = false; Close(); };
 
         btnPanel.Children.Add(okBtn);
@@ -54,7 +57,12 @@ public partial class InputDialog : Window
         textBox.KeyDown += (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.Enter)
-                okBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                okBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            else if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                DialogResult = false;
+                Close();
+            }
         };
     }
 }

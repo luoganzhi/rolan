@@ -2,7 +2,24 @@
   "defaultGroups": [
     {
       "name": "常用工具",
-      "items": []
+      "items": [
+        {
+          "name": "文件资源管理器",
+          "targetPath": "rolan:explorer"
+        },
+        {
+          "name": "Windows 设置",
+          "targetPath": "rolan:settings"
+        },
+        {
+          "name": "任务管理器",
+          "targetPath": "rolan:task-manager"
+        },
+        {
+          "name": "锁定电脑",
+          "targetPath": "rolan:lock"
+        }
+      ]
     },
     {
       "name": "开发工具",

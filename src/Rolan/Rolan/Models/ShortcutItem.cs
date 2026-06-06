@@ -7,7 +7,8 @@ public enum ShortcutType
     Application,
     File,
     Folder,
-    Url
+    Url,
+    SystemCommand
 }
 
 public partial class ShortcutItem : ObservableObject
@@ -41,4 +42,10 @@ public partial class ShortcutItem : ObservableObject
 
     [ObservableProperty]
     private DateTime _createdAt = DateTime.Now;
+
+    [ObservableProperty]
+    private int _launchCount;
+
+    [ObservableProperty]
+    private DateTime? _lastLaunchedAt;
 }

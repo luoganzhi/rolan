@@ -1,6 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using System.Diagnostics;
+using System.IO;
+using Rolan.Helpers;
 using Rolan.Models;
 using Rolan.Services;
 
@@ -8,6 +11,25 @@ namespace Rolan.ViewModels;
 
 public partial class SettingsViewModel : ObservableObject
 {
+    private static readonly HotkeyChoice[] ModifierChoices =
+    [
+        new("Alt", 1),
+        new("Ctrl + Alt", 1 | 2),
+        new("Ctrl + Shift", 2 | 4),
+        new("Alt + Shift", 1 | 4)
+    ];
+
+    private static readonly HotkeyChoice[] KeyChoices =
+    [
+        new("Space", 0x20),
+        new("R", 0x52),
+        new("Q", 0x51),
+        new("A", 0x41),
+        new("S", 0x53),
+        new("D", 0x44),
+        new("F", 0x46)
+    ];
+
     private readonly MainViewModel _mainVm;
     private readonly PanelService _panelService;
     private readonly IThemeService _themeService;
@@ -31,13 +53,25 @@ public partial class SettingsViewModel : ObservableObject
     private bool _autoStart;
 
     [ObservableProperty]
+    private bool _hideAfterLaunch;
+
+    [ObservableProperty]
     private string _selectedTheme;
 
     [ObservableProperty]
     private int _selectedPanelSideIndex;
 
+    [ObservableProperty]
+    private int _selectedHotkeyModifierIndex;
+
+    [ObservableProperty]
+    private int _selectedHotkeyKeyIndex;
+
     public string[] Themes { get; }
     public string[] PanelSides { get; } = { "左侧", "右侧" };
+    public string[] HotkeyModifierOptions { get; } = ModifierChoices.Select(c => c.Label).ToArray();
+    public string[] HotkeyKeyOptions { get; } = KeyChoices.Select(c => c.Label).ToArray();
+    public string DataDirectory { get; } = AppStorage.GetDataDirectory();
 
     public SettingsViewModel(
         MainViewModel mainVm,
@@ -57,9 +91,12 @@ public partial class SettingsViewModel : ObservableObject
         _hideWhenLostFocus = _settings.HideWhenLostFocus;
         _mousePenetration = _settings.MousePenetration;
         _topMost = _settings.TopMost;
-        _autoStart = _settings.AutoStart;
+        _autoStart = _autoStartService.IsEnabled;
+        _hideAfterLaunch = _settings.HideAfterLaunch;
         _selectedTheme = _settings.Theme;
         _selectedPanelSideIndex = (int)_settings.PanelSide;
+        _selectedHotkeyModifierIndex = FindChoiceIndex(ModifierChoices, _settings.HotkeyModifiers);
+        _selectedHotkeyKeyIndex = FindChoiceIndex(KeyChoices, _settings.HotkeyKey);
 
         Themes = _themeService.AvailableThemes;
     }
@@ -67,62 +104,116 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
+        var panelSideChanged = _settings.PanelSide != (PanelSide)SelectedPanelSideIndex;
+
         _settings.AutoHide = AutoHide;
         _settings.HideWhenLostFocus = HideWhenLostFocus;
         _settings.MousePenetration = MousePenetration;
         _settings.TopMost = TopMost;
         _settings.AutoStart = AutoStart;
+        _settings.HideAfterLaunch = HideAfterLaunch;
         _settings.Theme = SelectedTheme;
         _settings.PanelSide = (PanelSide)SelectedPanelSideIndex;
+        _settings.HotkeyModifiers = GetChoiceValue(ModifierChoices, SelectedHotkeyModifierIndex);
+        _settings.HotkeyKey = GetChoiceValue(KeyChoices, SelectedHotkeyKeyIndex);
         _settings.Save();
 
         _panelService.UpdateSettings(_settings);
         _panelService.SetMousePenetration(MousePenetration);
         _panelService.SetTopMost(TopMost);
-        _panelService.PositionPanel();
+        if (panelSideChanged)
+            _panelService.PositionPanel();
+        else
+            _panelService.SnapToSideAndSavePlacement();
 
         _themeService.ApplyTheme(SelectedTheme);
         _autoStartService.SetEnabled(AutoStart);
+        _mainVm.NotifySettingsUpdated(_settings);
+    }
+
+    [RelayCommand]
+    private void OpenDataDirectory()
+    {
+        Directory.CreateDirectory(DataDirectory);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = DataDirectory,
+            UseShellExecute = true
+        });
     }
 
     [RelayCommand]
     private async Task ExportData()
     {
-        var dialog = new SaveFileDialog
+        var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "Rolan 数据文件 (*.rolan)|*.rolan|JSON 文件 (*.json)|*.json",
             DefaultExt = ".rolan",
             FileName = $"rolan_backup_{DateTime.Now:yyyyMMdd}"
         };
 
-        if (dialog.ShowDialog() == true)
+        bool? dialogResult;
+        using (_panelService.SuspendAutoHide())
+        {
+            dialogResult = dialog.ShowDialog();
+        }
+
+        if (dialogResult == true)
         {
             var groups = _mainVm.Groups.OrderBy(g => g.Order).ToList();
             await _dataExportService.ExportAsync(dialog.FileName, groups);
-            System.Windows.MessageBox.Show("导出成功！", "Rolan");
+            using (_panelService.SuspendAutoHide())
+            {
+                System.Windows.MessageBox.Show("导出成功！", "Rolan");
+            }
         }
     }
 
     [RelayCommand]
     private async Task ImportData()
     {
-        var dialog = new OpenFileDialog
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Filter = "Rolan 数据文件 (*.rolan)|*.rolan|JSON 文件 (*.json)|*.json"
         };
 
-        if (dialog.ShowDialog() == true)
+        bool? dialogResult;
+        using (_panelService.SuspendAutoHide())
+        {
+            dialogResult = dialog.ShowDialog();
+        }
+
+        if (dialogResult == true)
         {
             try
             {
                 await _mainVm.ImportDataAsync(dialog.FileName);
-                System.Windows.MessageBox.Show("导入成功！", "Rolan");
+                using (_panelService.SuspendAutoHide())
+                {
+                    System.Windows.MessageBox.Show("导入成功！", "Rolan");
+                }
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"导入失败: {ex.Message}", "Rolan",
-                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                using (_panelService.SuspendAutoHide())
+                {
+                    System.Windows.MessageBox.Show($"导入失败: {ex.Message}", "Rolan",
+                        System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
             }
         }
     }
+
+    private static int FindChoiceIndex(HotkeyChoice[] choices, int value)
+    {
+        var index = Array.FindIndex(choices, c => c.Value == value);
+        return index < 0 ? 0 : index;
+    }
+
+    private static int GetChoiceValue(HotkeyChoice[] choices, int index)
+    {
+        return choices[Math.Clamp(index, 0, choices.Length - 1)].Value;
+    }
+
+    private readonly record struct HotkeyChoice(string Label, int Value);
 }

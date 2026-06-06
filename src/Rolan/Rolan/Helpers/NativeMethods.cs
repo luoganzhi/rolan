@@ -25,6 +25,7 @@ internal static class NativeMethods
     public const int WM_NCMOUSEMOVE = 0x00A0;
     public const int WM_MOUSEMOVE = 0x0200;
     public const int WM_MOUSELEAVE = 0x02A3;
+    public const int WM_DPICHANGED = 0x02E0;
 
     // HitTest 结果
     public const int HTTRANSPARENT = -1;
@@ -70,6 +71,10 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern int DestroyIcon(IntPtr hIcon);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool LockWorkStation();
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     public struct SHFILEINFO

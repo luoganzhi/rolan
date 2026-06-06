@@ -11,4 +11,5 @@ public interface IDataService
     Task DeleteItemAsync(int itemId);
     Task ReorderGroupAsync(int groupId, int newOrder);
     Task ReorderItemAsync(int itemId, int newOrder);
+    Task RecordItemLaunchAsync(int itemId, int launchCount, DateTime lastLaunchedAt);
 }

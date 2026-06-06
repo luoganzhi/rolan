@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Rolan.Helpers;
 using Rolan.Models;
 
@@ -14,16 +15,24 @@ public class PanelService
     private DispatcherTimer? _hideTimer;
     private DispatcherTimer? _slideTimer;
     private DispatcherTimer? _edgeMonitor;
+    private DispatcherTimer? _savePlacementTimer;
     private bool _isHidden;
     private bool _isHovering;
     private bool _sliding;
+    private bool _positioning;
     private double _slideTarget;
+    private int _autoHideSuppressionCount;
 
     private const int TriggerEdgeWidth = 5;
     private const int HiddenEdgeWidth = 3;
+    private const int PanelMargin = 12;
+    private const int MinPanelWidth = 280;
+    private const int MaxPanelWidth = 720;
+    private const int MinPanelHeight = 420;
     private const int SlideStepPx = 16;
     private const int SlideIntervalMs = 10;
     private const int EdgePollIntervalMs = 200;
+    private const int SavePlacementDelayMs = 350;
 
     public bool IsHidden => _isHidden;
     public event Action? VisibilityChanged;
@@ -45,52 +54,100 @@ public class PanelService
             source?.AddHook(WndProcHook);
         };
         _window.LocationChanged += OnLocationChanged;
+        _window.SizeChanged += OnSizeChanged;
         _window.Deactivated += OnDeactivated;
+        _window.Closed += OnClosed;
         _window.MouseEnter += (_, _) => OnMouseEnter();
         _window.MouseLeave += (_, _) => OnMouseLeave();
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
 
-    private static IntPtr WndProcHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    private IntPtr WndProcHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        // 处理窗口消息，可扩展
+        if (msg == NativeMethods.WM_DPICHANGED)
+            _window?.Dispatcher.BeginInvoke(PositionPanel);
+
         return IntPtr.Zero;
     }
 
     private void OnDeactivated(object? sender, EventArgs e)
     {
-        if (_settings.HideWhenLostFocus && !_isHidden)
+        if (_settings.AutoHide && _settings.HideWhenLostFocus && !_isHidden && !IsAutoHideSuppressed())
             AnimateHide();
     }
 
     private void OnLocationChanged(object? sender, EventArgs e)
     {
-        if (!_sliding)
-            CheckAutoHide();
+        if (_sliding || _positioning)
+            return;
+
+        SavePlacementDebounced();
+        CheckAutoHide();
+    }
+
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_window == null || _positioning || _sliding)
+            return;
+
+        ApplyWindowLimits();
+        ClampWindowToWorkingArea(snapToSide: true);
+        SavePlacementDebounced();
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        _window?.Dispatcher.BeginInvoke(PositionPanel);
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        StopHideTimer();
+        StopSlide();
+        StopEdgeMonitor();
+        StopSavePlacementTimer(saveNow: true);
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
     }
 
     public void PositionPanel()
     {
         if (_window == null) return;
         var (waX, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
-        var panelWidth = _settings.PanelWidth;
+        var maxWidth = GetMaxPanelWidth(waWidth);
+        var maxHeight = GetMaxPanelHeight(waHeight);
+        var minHeight = Math.Min(MinPanelHeight, maxHeight);
+        var panelWidth = Clamp(_settings.PanelWidth, MinPanelWidth, maxWidth);
+        var panelHeight = Clamp(_settings.PanelHeight, minHeight, maxHeight);
+        var centeredTop = waY + Math.Max(0, (waHeight - panelHeight) / 2);
+        var top = Clamp(_settings.PanelTop ?? centeredTop, waY, GetMaxPanelTop(waY, waHeight, panelHeight));
 
-        _window.Width = panelWidth;
-        _window.Height = waHeight;
-        _window.Top = waY;
-        _window.Left = _isHidden
-            ? (_settings.PanelSide == PanelSide.Left
-                ? waX - panelWidth + HiddenEdgeWidth
-                : waX + waWidth - HiddenEdgeWidth)
-            : (_settings.PanelSide == PanelSide.Left
-                ? waX
-                : waX + waWidth - panelWidth);
+        _positioning = true;
+        try
+        {
+            ApplyWindowLimits();
+            _window.Width = panelWidth;
+            _window.Height = panelHeight;
+            _window.Top = top;
+            _window.Left = _isHidden
+                ? (_settings.PanelSide == PanelSide.Left
+                    ? waX - panelWidth + HiddenEdgeWidth
+                    : waX + waWidth - HiddenEdgeWidth)
+                : (_settings.PanelSide == PanelSide.Left
+                    ? waX
+                    : waX + waWidth - panelWidth);
+            _settings.PanelTop = top;
+        }
+        finally
+        {
+            _positioning = false;
+        }
     }
 
     public void CheckAutoHide()
     {
-        if (_window == null || !_settings.AutoHide || _isHovering || _sliding) return;
+        if (_window == null || !_settings.AutoHide || _isHovering || _sliding || IsAutoHideSuppressed()) return;
 
-        var mousePos = System.Windows.Forms.Cursor.Position;
+        var mousePos = WindowHelper.GetCursorPosition(_window);
         var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
 
         bool nearPanel = _settings.PanelSide == PanelSide.Left
@@ -108,7 +165,7 @@ public class PanelService
         _hideTimer.Tick += (_, _) =>
         {
             StopHideTimer();
-            if (_window != null && !_isHovering && !_sliding)
+            if (_window != null && !_isHovering && !_sliding && !IsAutoHideSuppressed())
                 AnimateHide();
         };
         _hideTimer.Start();
@@ -124,7 +181,7 @@ public class PanelService
 
     public void AnimateHide()
     {
-        if (_window == null || _isHidden) return;
+        if (_window == null || _isHidden || IsAutoHideSuppressed()) return;
         StopSlide();
 
         var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
@@ -135,7 +192,8 @@ public class PanelService
         StartSlideTowards(_slideTarget, onComplete: () =>
         {
             _isHidden = true;
-            StartEdgeMonitor();
+            if (_settings.AutoHide)
+                StartEdgeMonitor();
             VisibilityChanged?.Invoke();
         });
     }
@@ -181,7 +239,7 @@ public class PanelService
     public void OnMouseLeave()
     {
         _isHovering = false;
-        if (_settings.AutoHide && !_isHidden)
+        if (_settings.AutoHide && !_isHidden && !IsAutoHideSuppressed())
             StartHideTimer();
     }
 
@@ -194,16 +252,16 @@ public class PanelService
         _edgeMonitor.Tick += (_, _) =>
         {
             if (_window == null || !_isHidden) { StopEdgeMonitor(); return; }
-            var mousePos = System.Windows.Forms.Cursor.Position;
-            var (waX, waY, waWidth, _) = WindowHelper.GetWorkingArea(_window);
+            var mousePos = WindowHelper.GetCursorPosition(_window);
+            var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
 
             bool touchingEdge = _settings.PanelSide == PanelSide.Left
                 ? mousePos.X - waX <= TriggerEdgeWidth
-                  && mousePos.Y >= waY
-                  && mousePos.Y <= waY + _window.Height
+                  && mousePos.Y >= _window.Top
+                  && mousePos.Y <= _window.Top + _window.Height
                 : waX + waWidth - mousePos.X <= TriggerEdgeWidth
-                  && mousePos.Y >= waY
-                  && mousePos.Y <= waY + _window.Height;
+                  && mousePos.Y >= _window.Top
+                  && mousePos.Y <= _window.Top + _window.Height;
 
             if (touchingEdge)
                 AnimateShow();
@@ -268,5 +326,165 @@ public class PanelService
     public void UpdateSettings(AppSettings settings)
     {
         _settings = settings;
+        if (!_settings.AutoHide)
+        {
+            StopHideTimer();
+            StopEdgeMonitor();
+            if (_isHidden)
+            {
+                _isHidden = false;
+                PositionPanel();
+                VisibilityChanged?.Invoke();
+            }
+        }
+    }
+
+    public void SnapToSideAndSavePlacement()
+    {
+        if (_window == null || _sliding)
+            return;
+
+        ClampWindowToWorkingArea(snapToSide: true);
+        SavePlacementNow();
+    }
+
+    public IDisposable SuspendAutoHide()
+    {
+        _autoHideSuppressionCount++;
+        StopHideTimer();
+        return new AutoHideScope(this);
+    }
+
+    private void ResumeAutoHide()
+    {
+        _autoHideSuppressionCount = Math.Max(0, _autoHideSuppressionCount - 1);
+        if (_autoHideSuppressionCount == 0)
+            CheckAutoHide();
+    }
+
+    private bool IsAutoHideSuppressed()
+        => _autoHideSuppressionCount > 0 ||
+           (_window?.OwnedWindows.OfType<Window>().Any(window => window.IsVisible) ?? false);
+
+    private void ApplyWindowLimits()
+    {
+        if (_window == null)
+            return;
+
+        var (_, _, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
+        _window.MinWidth = MinPanelWidth;
+        _window.MaxWidth = GetMaxPanelWidth(waWidth);
+        _window.MinHeight = Math.Min(MinPanelHeight, GetMaxPanelHeight(waHeight));
+        _window.MaxHeight = GetMaxPanelHeight(waHeight);
+    }
+
+    private void ClampWindowToWorkingArea(bool snapToSide)
+    {
+        if (_window == null)
+            return;
+
+        var (waX, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
+        var maxWidth = GetMaxPanelWidth(waWidth);
+        var maxHeight = GetMaxPanelHeight(waHeight);
+        var minHeight = Math.Min(MinPanelHeight, maxHeight);
+        var width = Clamp(_window.Width, MinPanelWidth, maxWidth);
+        var height = Clamp(_window.Height, minHeight, maxHeight);
+        var top = Clamp(_window.Top, waY, GetMaxPanelTop(waY, waHeight, height));
+
+        _positioning = true;
+        try
+        {
+            _window.Width = width;
+            _window.Height = height;
+            _window.Top = top;
+
+            if (snapToSide)
+            {
+                _window.Left = _isHidden
+                    ? (_settings.PanelSide == PanelSide.Left
+                        ? waX - width + HiddenEdgeWidth
+                        : waX + waWidth - HiddenEdgeWidth)
+                    : (_settings.PanelSide == PanelSide.Left
+                        ? waX
+                        : waX + waWidth - width);
+            }
+        }
+        finally
+        {
+            _positioning = false;
+        }
+    }
+
+    private void SavePlacementDebounced()
+    {
+        if (_window == null)
+            return;
+
+        _savePlacementTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SavePlacementDelayMs) };
+        _savePlacementTimer.Tick -= OnSavePlacementTimerTick;
+        _savePlacementTimer.Tick += OnSavePlacementTimerTick;
+        _savePlacementTimer.Stop();
+        _savePlacementTimer.Start();
+    }
+
+    private void OnSavePlacementTimerTick(object? sender, EventArgs e)
+        => StopSavePlacementTimer(saveNow: true);
+
+    private void StopSavePlacementTimer(bool saveNow)
+    {
+        if (_savePlacementTimer == null)
+            return;
+
+        _savePlacementTimer.Stop();
+        _savePlacementTimer.Tick -= OnSavePlacementTimerTick;
+        _savePlacementTimer = null;
+
+        if (saveNow)
+            SavePlacementNow();
+    }
+
+    private void SavePlacementNow()
+    {
+        if (_window == null)
+            return;
+
+        var (_, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
+        var width = Clamp(_window.Width, MinPanelWidth, GetMaxPanelWidth(waWidth));
+        var maxHeight = GetMaxPanelHeight(waHeight);
+        var height = Clamp(_window.Height, Math.Min(MinPanelHeight, maxHeight), maxHeight);
+        var top = Clamp(_window.Top, waY, GetMaxPanelTop(waY, waHeight, height));
+
+        _settings.PanelWidth = (int)Math.Round(width);
+        _settings.PanelHeight = (int)Math.Round(height);
+        _settings.PanelTop = top;
+        _settings.Save();
+    }
+
+    private static double GetMaxPanelWidth(double workingAreaWidth)
+        => Math.Max(MinPanelWidth, Math.Min(MaxPanelWidth, workingAreaWidth - PanelMargin * 2));
+
+    private static double GetMaxPanelHeight(double workingAreaHeight)
+        => Math.Max(240, workingAreaHeight - PanelMargin * 2);
+
+    private static double GetMaxPanelTop(double workingAreaY, double workingAreaHeight, double panelHeight)
+        => Math.Max(workingAreaY, workingAreaY + workingAreaHeight - panelHeight);
+
+    private static double Clamp(double value, double min, double max)
+        => Math.Max(min, Math.Min(max, value));
+
+    private sealed class AutoHideScope : IDisposable
+    {
+        private PanelService? _owner;
+
+        public AutoHideScope(PanelService owner)
+        {
+            _owner = owner;
+        }
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?.ResumeAutoHide();
+        }
     }
 }

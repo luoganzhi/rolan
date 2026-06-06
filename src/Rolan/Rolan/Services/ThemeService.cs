@@ -8,7 +8,7 @@ public class ThemeService : IThemeService
 
     public void ApplyTheme(string themeName)
     {
-        var app = Application.Current;
+        var app = System.Windows.Application.Current;
         if (app == null) return;
 
         var oldDict = app.Resources.MergedDictionaries

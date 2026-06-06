@@ -40,6 +40,9 @@ public partial class MainViewModel : ObservableObject
     private bool _isSearching;
 
     [ObservableProperty]
+    private bool _isFrequentGroupSelected;
+
+    [ObservableProperty]
     private ShortcutItem? _selectedShortcut;
 
     public MainViewModel(
@@ -103,6 +106,23 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSelectedGroupChanged(ShortcutGroup? value)
     {
+        if (value != null && IsFrequentGroupSelected)
+            IsFrequentGroupSelected = false;
+
+        RefreshFilteredItems();
+    }
+
+    partial void OnIsFrequentGroupSelectedChanged(bool value)
+    {
+        if (value)
+        {
+            SelectedGroup = null;
+        }
+        else if (SelectedGroup == null)
+        {
+            SelectedGroup = Groups.FirstOrDefault();
+        }
+
         RefreshFilteredItems();
     }
 
@@ -112,7 +132,7 @@ public partial class MainViewModel : ObservableObject
     private IEnumerable<ShortcutItem> GetFilteredItems()
     {
         var group = SelectedGroup;
-        if (group == null) return Enumerable.Empty<ShortcutItem>();
+        if (!IsFrequentGroupSelected && group == null) return Enumerable.Empty<ShortcutItem>();
 
         if (IsSearching)
         {
@@ -124,7 +144,24 @@ public partial class MainViewModel : ObservableObject
                 .ToList();
         }
 
+        if (IsFrequentGroupSelected)
+            return GetFrequentItems();
+
+        if (group == null)
+            return Enumerable.Empty<ShortcutItem>();
+
         return group.Items.OrderBy(i => i.Order).ToList();
+    }
+
+    private IEnumerable<ShortcutItem> GetFrequentItems()
+    {
+        return Groups.SelectMany(g => g.Items)
+            .Where(i => i.LaunchCount > 0 || i.LastLaunchedAt != null)
+            .OrderByDescending(i => i.LastLaunchedAt ?? DateTime.MinValue)
+            .ThenByDescending(i => i.LaunchCount)
+            .ThenBy(i => i.Name)
+            .Take(24)
+            .ToList();
     }
 
     private void RefreshFilteredItems()
@@ -329,10 +366,17 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void SelectGroupByIndex(int index)
     {
-        if (index < 0 || index >= Groups.Count)
+        if (index == 0)
+        {
+            IsFrequentGroupSelected = true;
+            return;
+        }
+
+        var groupIndex = index - 1;
+        if (groupIndex < 0 || groupIndex >= Groups.Count)
             return;
 
-        SelectedGroup = Groups[index];
+        SelectedGroup = Groups[groupIndex];
     }
 
     [RelayCommand]
@@ -577,12 +621,14 @@ public partial class MainViewModel : ObservableObject
     private async Task<bool> AddShortcut(string? targetPath)
     {
         targetPath = TargetPathHelper.NormalizeInput(targetPath);
-        if (string.IsNullOrWhiteSpace(targetPath) || SelectedGroup == null) return false;
+        var targetGroup = SelectedGroup ?? Groups.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(targetPath) || targetGroup == null) return false;
 
-        var existing = SelectedGroup.Items.FirstOrDefault(i =>
+        var existing = targetGroup.Items.FirstOrDefault(i =>
             string.Equals(i.TargetPath, targetPath, StringComparison.OrdinalIgnoreCase));
         if (existing != null)
         {
+            SelectedGroup = targetGroup;
             SelectedShortcut = existing;
             RefreshFilteredItems();
             return false;
@@ -591,12 +637,12 @@ public partial class MainViewModel : ObservableObject
         var type = DetectType(targetPath);
         var item = new ShortcutItem
         {
-            GroupId = SelectedGroup.Id,
+            GroupId = targetGroup.Id,
             Name = GetShortcutName(targetPath, type),
             TargetPath = targetPath,
             Type = type,
-            GroupName = SelectedGroup.Name,
-            Order = SelectedGroup.Items.Any() ? SelectedGroup.Items.Max(i => i.Order) + 1 : 0
+            GroupName = targetGroup.Name,
+            Order = targetGroup.Items.Any() ? targetGroup.Items.Max(i => i.Order) + 1 : 0
         };
 
         // 尝试提取图标
@@ -614,7 +660,8 @@ public partial class MainViewModel : ObservableObject
         catch { }
 
         await _dataService.SaveItemAsync(item);
-        SelectedGroup.Items.Add(item);
+        targetGroup.Items.Add(item);
+        SelectedGroup = targetGroup;
         SelectedShortcut = item;
         RefreshFilteredItems();
         return true;
@@ -1140,15 +1187,21 @@ public partial class MainViewModel : ObservableObject
 
     private void MoveGroupSelection(int offset)
     {
-        if (Groups.Count == 0)
+        var totalTabs = Groups.Count + 1;
+        if (totalTabs == 0)
             return;
 
-        var currentIndex = SelectedGroup == null ? -1 : Groups.IndexOf(SelectedGroup);
+        var currentIndex = IsFrequentGroupSelected
+            ? 0
+            : SelectedGroup == null ? -1 : Groups.IndexOf(SelectedGroup) + 1;
         var nextIndex = currentIndex < 0
             ? 0
-            : (currentIndex + offset + Groups.Count) % Groups.Count;
+            : (currentIndex + offset + totalTabs) % totalTabs;
 
-        SelectedGroup = Groups[nextIndex];
+        if (nextIndex == 0)
+            IsFrequentGroupSelected = true;
+        else
+            SelectedGroup = Groups[nextIndex - 1];
     }
 
     private void EnsureSelectedShortcut()

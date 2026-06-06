@@ -67,6 +67,36 @@
             </Setter>
         </Style>
 
+        <Style x:Key="FrequentGroupToggle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="2,2" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="ToggleBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}"
+                                Margin="{TemplateBinding Margin}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="#CCFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="#DDEEEEFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ShortcutListBoxItem" TargetType="ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0" />
@@ -284,6 +314,12 @@
                             Foreground="#555"
                             Click="OnAddGroupClick"
                             ToolTip="添加分组" />
+                    <ToggleButton x:Name="FrequentGroupButton"
+                                  DockPanel.Dock="Left"
+                                  Content="常用"
+                                  IsChecked="{Binding IsFrequentGroupSelected, Mode=TwoWay}"
+                                  Style="{StaticResource FrequentGroupToggle}"
+                                  ToolTip="最近和常用快捷方式" />
                     <ListBox x:Name="GroupTabBar"
                              ItemsSource="{Binding Groups}"
                              SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"

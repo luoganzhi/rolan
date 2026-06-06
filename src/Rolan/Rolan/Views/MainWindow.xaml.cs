@@ -191,7 +191,7 @@ public partial class MainWindow : Window
         using (ViewModel.PanelService.SuspendAutoHide())
         {
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.Result))
-                await ViewModel.AddGroupCommand.ExecuteAsync(dialog.Result.Trim());
+                await ViewModel.AddGroupCommand.ExecuteAsync(dialog.Result);
         }
     }
 
@@ -667,11 +667,8 @@ public partial class MainWindow : Window
         dialog.Owner = this;
         using (ViewModel?.PanelService.SuspendAutoHide())
         {
-            if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.Result))
-            {
-                group.Name = dialog.Result;
-                ViewModel?.RenameGroupCommand.Execute(group);
-            }
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.Result))
+                ViewModel?.RenameGroupCommand.Execute(new Tuple<ShortcutGroup, string>(group, dialog.Result));
         }
     }
 

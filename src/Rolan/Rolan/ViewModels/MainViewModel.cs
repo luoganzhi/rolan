@@ -338,8 +338,14 @@ public partial class MainViewModel : ObservableObject
     private async Task AddGroup(string? groupName = null)
     {
         groupName = string.IsNullOrWhiteSpace(groupName)
-            ? $"分组 {Groups.Count + 1}"
+            ? GenerateDefaultGroupName()
             : groupName.Trim();
+
+        if (!ValidateGroupName(groupName, null, out var message))
+        {
+            ShowGroupValidationMessage(message);
+            return;
+        }
 
         var newGroup = new ShortcutGroup
         {
@@ -471,10 +477,66 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RenameGroup(ShortcutGroup? group)
+    private async Task RenameGroup(Tuple<ShortcutGroup, string>? args)
     {
-        if (group == null) return;
+        if (args == null) return;
+
+        var group = args.Item1;
+        var groupName = args.Item2.Trim();
+        if (!ValidateGroupName(groupName, group.Id, out var message))
+        {
+            ShowGroupValidationMessage(message);
+            return;
+        }
+
+        if (string.Equals(group.Name, groupName, StringComparison.Ordinal))
+            return;
+
+        group.Name = groupName;
         await _dataService.SaveGroupAsync(group);
+    }
+
+    private string GenerateDefaultGroupName()
+    {
+        var index = Groups.Count + 1;
+        string groupName;
+        do
+        {
+            groupName = $"分组 {index++}";
+        }
+        while (Groups.Any(group => string.Equals(group.Name, groupName, StringComparison.OrdinalIgnoreCase)));
+
+        return groupName;
+    }
+
+    private bool ValidateGroupName(string groupName, int? currentGroupId, out string message)
+    {
+        if (string.IsNullOrWhiteSpace(groupName))
+        {
+            message = "分组名称不能为空。";
+            return false;
+        }
+
+        var duplicate = Groups.Any(group =>
+            (!currentGroupId.HasValue || group.Id != currentGroupId.Value) &&
+            string.Equals(group.Name.Trim(), groupName.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (duplicate)
+        {
+            message = $"已存在名为 \"{groupName.Trim()}\" 的分组。";
+            return false;
+        }
+
+        message = string.Empty;
+        return true;
+    }
+
+    private void ShowGroupValidationMessage(string message)
+    {
+        using (_panelService.SuspendAutoHide())
+        {
+            System.Windows.MessageBox.Show(message, "Rolan",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
     }
 
     [RelayCommand]

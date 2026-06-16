@@ -553,7 +553,7 @@ public partial class MainViewModel : ObservableObject
         if (group == null) return;
         if (Groups.Count <= 1)
         {
-            System.Windows.MessageBox.Show("至少需要保留一个分组。", "Rolan",
+            _panelService.ShowMessage("至少需要保留一个分组。",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             return;
         }
@@ -630,11 +630,8 @@ public partial class MainViewModel : ObservableObject
 
     private void ShowGroupValidationMessage(string message)
     {
-        using (_panelService.SuspendAutoHide())
-        {
-            System.Windows.MessageBox.Show(message, "Rolan",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-        }
+        _panelService.ShowMessage(message,
+            System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
     }
 
     private async Task MoveAllShortcutsToGroupAsync(ShortcutGroup sourceGroup, ShortcutGroup targetGroup)
@@ -810,11 +807,7 @@ public partial class MainViewModel : ObservableObject
             Multiselect = true
         };
 
-        bool? dialogResult;
-        using (_panelService.SuspendAutoHide())
-        {
-            dialogResult = dialog.ShowDialog();
-        }
+        var dialogResult = _panelService.ShowDialog(dialog);
 
         if (dialogResult == true)
         {
@@ -834,11 +827,7 @@ public partial class MainViewModel : ObservableObject
             UseDescriptionForTitle = true
         };
 
-        System.Windows.Forms.DialogResult dialogResult;
-        using (_panelService.SuspendAutoHide())
-        {
-            dialogResult = dialog.ShowDialog();
-        }
+        var dialogResult = _panelService.ShowDialog(dialog);
 
         if (dialogResult == System.Windows.Forms.DialogResult.OK)
             await AddShortcut(dialog.SelectedPath);
@@ -1208,11 +1197,8 @@ public partial class MainViewModel : ObservableObject
 
         if (shortcuts.Count == 0)
         {
-            using (_panelService.SuspendAutoHide())
-            {
-                System.Windows.MessageBox.Show($"未找到{sourceName}快捷方式。", "Rolan",
-                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-            }
+            _panelService.ShowMessage($"未找到{sourceName}快捷方式。",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             return;
         }
 
@@ -1229,11 +1215,8 @@ public partial class MainViewModel : ObservableObject
         var message = imported > 0
             ? $"已导入 {imported} 个{sourceName}快捷方式，跳过 {skipped} 个重复项。"
             : $"当前分组已包含找到的{sourceName}快捷方式，跳过 {skipped} 个重复项。";
-        using (_panelService.SuspendAutoHide())
-        {
-            System.Windows.MessageBox.Show(message, "Rolan",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-        }
+        _panelService.ShowMessage(message,
+            System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
     }
 
     private async Task SaveGroupOrderAsync()

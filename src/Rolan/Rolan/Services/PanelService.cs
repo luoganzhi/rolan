@@ -410,6 +410,39 @@ public class PanelService
         return new AutoHideScope(this);
     }
 
+    public bool? ShowDialog(Microsoft.Win32.CommonDialog dialog)
+    {
+        using (SuspendAutoHide())
+        {
+            return _window == null
+                ? dialog.ShowDialog()
+                : dialog.ShowDialog(_window);
+        }
+    }
+
+    public System.Windows.Forms.DialogResult ShowDialog(System.Windows.Forms.CommonDialog dialog)
+    {
+        using (SuspendAutoHide())
+        {
+            return _window == null
+                ? dialog.ShowDialog()
+                : dialog.ShowDialog(new Win32WindowOwner(_window));
+        }
+    }
+
+    public System.Windows.MessageBoxResult ShowMessage(
+        string message,
+        System.Windows.MessageBoxButton buttons = System.Windows.MessageBoxButton.OK,
+        System.Windows.MessageBoxImage image = System.Windows.MessageBoxImage.None)
+    {
+        using (SuspendAutoHide())
+        {
+            return _window == null
+                ? System.Windows.MessageBox.Show(message, "Rolan", buttons, image)
+                : System.Windows.MessageBox.Show(_window, message, "Rolan", buttons, image);
+        }
+    }
+
     private void ResumeAutoHide()
     {
         _autoHideSuppressionCount = Math.Max(0, _autoHideSuppressionCount - 1);
@@ -617,6 +650,16 @@ public class PanelService
             var owner = Interlocked.Exchange(ref _owner, null);
             owner?.ResumeAutoHide();
         }
+    }
+
+    private sealed class Win32WindowOwner : System.Windows.Forms.IWin32Window
+    {
+        public Win32WindowOwner(Window window)
+        {
+            Handle = new WindowInteropHelper(window).Handle;
+        }
+
+        public IntPtr Handle { get; }
     }
 
     private enum PanelVisibilityState

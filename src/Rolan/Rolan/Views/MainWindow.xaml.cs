@@ -486,6 +486,7 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.F2 ||
             e.Key == Key.Delete && (allowPlainDelete || Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) ||
+            e.Key == Key.C && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ||
             e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ||
             e.Key == Key.O && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
@@ -520,6 +521,15 @@ public partial class MainWindow : Window
             case Key.O when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
                 e.Handled = true;
                 OpenFileLocation(item);
+                break;
+            case Key.C when Keyboard.Modifiers.HasFlag(ModifierKeys.Control) &&
+                            Keyboard.Modifiers.HasFlag(ModifierKeys.Shift):
+                e.Handled = true;
+                CopyTextToClipboard(BuildCommandLine(item));
+                break;
+            case Key.C when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
+                e.Handled = true;
+                CopyTextToClipboard(item.TargetPath);
                 break;
             case Key.D when Keyboard.Modifiers.HasFlag(ModifierKeys.Control):
                 e.Handled = true;

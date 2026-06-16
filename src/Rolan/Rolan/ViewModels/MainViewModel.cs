@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
 
     public PanelService PanelService => _panelService;
     public event Action<AppSettings>? SettingsChanged;
+    public event Action? LoadErrorOccurred;
 
     [ObservableProperty]
     private ObservableCollection<ShortcutGroup> _groups = new();
@@ -98,6 +99,7 @@ public partial class MainViewModel : ObservableObject
             RefreshFilteredItems();
 
             _pendingLoadErrorMessage = $"加载快捷方式数据失败：{ex.Message}";
+            LoadErrorOccurred?.Invoke();
         }
     }
 

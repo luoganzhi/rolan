@@ -85,6 +85,7 @@ public partial class MainWindow : Window
         vm.PanelService.SetMousePenetration(settings.MousePenetration);
         vm.PanelService.SetTopMost(settings.TopMost);
         vm.PropertyChanged += OnViewModelPropertyChanged;
+        vm.LoadErrorOccurred += OnLoadErrorOccurred;
         Loaded += OnMainWindowLoaded;
         RequestSearchFocus();
     }
@@ -179,6 +180,9 @@ public partial class MainWindow : Window
         _loadErrorMessageShown = true;
         ShowMessage(message, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
     }
+
+    private void OnLoadErrorOccurred()
+        => _ = Dispatcher.BeginInvoke(ShowPendingLoadError, DispatcherPriority.ContextIdle);
 
     private void OnPanelMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
         => ViewModel?.PanelService.OnMouseEnter();
@@ -1148,6 +1152,9 @@ public partial class MainWindow : Window
 
         if (ViewModel != null)
             ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+        if (ViewModel != null)
+            ViewModel.LoadErrorOccurred -= OnLoadErrorOccurred;
 
         Loaded -= OnMainWindowLoaded;
         if (_isPanelHeightFitAttached)

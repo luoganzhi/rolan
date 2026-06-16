@@ -111,7 +111,7 @@ public partial class App : System.Windows.Application
         menu.Items.Add("设置", null, (_, _) =>
         {
             ShowMainWindow();
-            _mainVm?.OpenSettingsCommand.Execute(null);
+            _mainVm?.OpenSettingsCommand.Execute(_mainWindow);
         });
         menu.Items.Add("关于", null, (_, _) =>
         {

@@ -128,7 +128,7 @@ public partial class MainWindow : Window
     // ---- 按钮事件 ----
 
     private void OnSettingsClick(object sender, RoutedEventArgs e)
-        => ViewModel?.OpenSettingsCommand.Execute(null);
+        => ViewModel?.OpenSettingsCommand.Execute(this);
 
     private void OnHideClick(object sender, RoutedEventArgs e)
         => ViewModel?.ToggleVisibilityCommand.Execute(null);

@@ -777,10 +777,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenSettings()
+    private void OpenSettings(System.Windows.Window? owner = null)
     {
-        var settingsWindow = new Views.SettingsWindow();
-        settingsWindow.DataContext = new SettingsViewModel(this, _panelService, _themeService, _autoStartService, _dataExportService);
+        var settingsWindow = new Views.SettingsWindow
+        {
+            Owner = owner,
+            DataContext = new SettingsViewModel(this, _panelService, _themeService, _autoStartService, _dataExportService)
+        };
         using (_panelService.SuspendAutoHide())
         {
             settingsWindow.ShowDialog();

@@ -75,14 +75,14 @@ public partial class EditShortcutDialog : Window
             var targetPath = TargetPathHelper.NormalizeInput(pathBox.Text);
             if (string.IsNullOrWhiteSpace(name))
             {
-                System.Windows.MessageBox.Show("名称不能为空。", "Rolan",
+                System.Windows.MessageBox.Show(this, "名称不能为空。", "Rolan",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(targetPath))
             {
-                System.Windows.MessageBox.Show("路径不能为空。", "Rolan",
+                System.Windows.MessageBox.Show(this, "路径不能为空。", "Rolan",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }

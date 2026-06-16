@@ -7,6 +7,13 @@ namespace Rolan.Services;
 
 public class ShellService : IShellService
 {
+    private readonly PanelService _panelService;
+
+    public ShellService(PanelService panelService)
+    {
+        _panelService = panelService;
+    }
+
     public bool Launch(string targetPath, string? arguments = null, string? workingDirectory = null)
     {
         try
@@ -31,7 +38,7 @@ public class ShellService : IShellService
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"无法启动: {targetPath}\n{ex.Message}", "Rolan",
+            _panelService.ShowMessage($"无法启动: {targetPath}\n{ex.Message}",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             return false;
         }

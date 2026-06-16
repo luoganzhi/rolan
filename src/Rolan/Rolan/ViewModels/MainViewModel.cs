@@ -24,6 +24,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IDataExportService _dataExportService;
     private readonly IDataDirectoryService _dataDirectoryService;
     private AppSettings _settings;
+    private string? _pendingLoadErrorMessage;
 
     public PanelService PanelService => _panelService;
     public event Action<AppSettings>? SettingsChanged;
@@ -96,9 +97,15 @@ public partial class MainViewModel : ObservableObject
             SelectedGroup = fallbackGroup;
             RefreshFilteredItems();
 
-            System.Windows.MessageBox.Show($"加载快捷方式数据失败：{ex.Message}", "Rolan",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            _pendingLoadErrorMessage = $"加载快捷方式数据失败：{ex.Message}";
         }
+    }
+
+    public string? TakePendingLoadErrorMessage()
+    {
+        var message = _pendingLoadErrorMessage;
+        _pendingLoadErrorMessage = null;
+        return message;
     }
 
     partial void OnSearchTextChanged(string value)

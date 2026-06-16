@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private bool _fittingPanelHeight;
     private bool _isPanelHeightFitAttached;
     private bool _panelHeightFitScheduled;
+    private bool _loadErrorMessageShown;
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
     public MainWindow(IHotkeyService hotkeyService)
@@ -126,6 +127,7 @@ public partial class MainWindow : Window
 
         ScheduleFitPanelHeightToContent();
         RequestSearchFocus();
+        ScheduleShowPendingLoadError();
     }
 
     private void OnMainWindowSizeChanged(object sender, SizeChangedEventArgs e)
@@ -157,6 +159,25 @@ public partial class MainWindow : Window
     {
         if (ViewModel?.PanelService.IsHidden == false && IsActive)
             RequestSearchFocus();
+    }
+
+    private void ScheduleShowPendingLoadError()
+    {
+        _ = Dispatcher.BeginInvoke(ShowPendingLoadError, DispatcherPriority.ContextIdle);
+        _ = Dispatcher.BeginInvoke(ShowPendingLoadError, DispatcherPriority.ApplicationIdle);
+    }
+
+    private void ShowPendingLoadError()
+    {
+        if (_loadErrorMessageShown || ViewModel == null)
+            return;
+
+        var message = ViewModel.TakePendingLoadErrorMessage();
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        _loadErrorMessageShown = true;
+        ShowMessage(message, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
     }
 
     private void OnPanelMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)

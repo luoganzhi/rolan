@@ -352,6 +352,30 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void SelectFirstShortcut()
+    {
+        MoveShortcutSelectionToEdge(first: true);
+    }
+
+    [RelayCommand]
+    private void SelectLastShortcut()
+    {
+        MoveShortcutSelectionToEdge(first: false);
+    }
+
+    [RelayCommand]
+    private void SelectNextShortcutPage()
+    {
+        MoveShortcutSelection(12);
+    }
+
+    [RelayCommand]
+    private void SelectPreviousShortcutPage()
+    {
+        MoveShortcutSelection(-12);
+    }
+
+    [RelayCommand]
     private void SelectNextGroup()
     {
         MoveGroupSelection(1);
@@ -1195,6 +1219,18 @@ public partial class MainViewModel : ObservableObject
             : (currentIndex + offset + items.Count) % items.Count;
 
         SelectedShortcut = items[nextIndex];
+    }
+
+    private void MoveShortcutSelectionToEdge(bool first)
+    {
+        var items = GetFilteredItems().ToList();
+        if (items.Count == 0)
+        {
+            SelectedShortcut = null;
+            return;
+        }
+
+        SelectedShortcut = first ? items[0] : items[^1];
     }
 
     private void MoveGroupSelection(int offset)

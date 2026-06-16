@@ -407,6 +407,9 @@ public partial class MainWindow : Window
         if (HandleSelectedShortcutKey(e, allowPlainDelete: string.IsNullOrEmpty(SearchBox.Text)))
             return;
 
+        if (HandleShortcutNavigationKey(e))
+            return;
+
         switch (e.Key)
         {
             case Key.Escape:
@@ -421,16 +424,6 @@ public partial class MainWindow : Window
                 ViewModel?.LaunchFirstFilteredItemCommand.Execute(null);
                 e.Handled = true;
                 break;
-            case Key.Down:
-                ViewModel?.SelectNextShortcutCommand.Execute(null);
-                ScrollSelectedShortcutIntoView();
-                e.Handled = true;
-                break;
-            case Key.Up:
-                ViewModel?.SelectPreviousShortcutCommand.Execute(null);
-                ScrollSelectedShortcutIntoView();
-                e.Handled = true;
-                break;
         }
     }
 
@@ -438,7 +431,43 @@ public partial class MainWindow : Window
         => ScrollSelectedShortcutIntoView();
 
     private async void OnShortcutGridKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        => await HandleSelectedShortcutKeyAsync(e, allowPlainDelete: true);
+    {
+        if (HandleShortcutNavigationKey(e))
+            return;
+
+        await HandleSelectedShortcutKeyAsync(e, allowPlainDelete: true);
+    }
+
+    private bool HandleShortcutNavigationKey(System.Windows.Input.KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Down:
+                ViewModel?.SelectNextShortcutCommand.Execute(null);
+                break;
+            case Key.Up:
+                ViewModel?.SelectPreviousShortcutCommand.Execute(null);
+                break;
+            case Key.PageDown:
+                ViewModel?.SelectNextShortcutPageCommand.Execute(null);
+                break;
+            case Key.PageUp:
+                ViewModel?.SelectPreviousShortcutPageCommand.Execute(null);
+                break;
+            case Key.Home:
+                ViewModel?.SelectFirstShortcutCommand.Execute(null);
+                break;
+            case Key.End:
+                ViewModel?.SelectLastShortcutCommand.Execute(null);
+                break;
+            default:
+                return false;
+        }
+
+        ScrollSelectedShortcutIntoView();
+        e.Handled = true;
+        return true;
+    }
 
     private bool HandleSelectedShortcutKey(System.Windows.Input.KeyEventArgs e, bool allowPlainDelete)
     {

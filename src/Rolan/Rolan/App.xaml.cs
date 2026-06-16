@@ -115,7 +115,11 @@ public partial class App : System.Windows.Application
         });
         menu.Items.Add("关于", null, (_, _) =>
         {
-            var about = new AboutWindow();
+            ShowMainWindow();
+            var about = new AboutWindow
+            {
+                Owner = _mainWindow
+            };
             about.ShowDialog();
         });
         menu.Items.Add(new ToolStripSeparator());

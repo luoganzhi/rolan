@@ -40,6 +40,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IAutoStartService, AutoStartService>();
         services.AddSingleton<IDataExportService, DataExportService>();
+        services.AddSingleton<IDataDirectoryService, DataDirectoryService>();
         services.AddSingleton<PanelService>();
         services.AddTransient<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
@@ -201,15 +202,19 @@ public partial class App : System.Windows.Application
             _toggleWindowMenuItem.Text = "隐藏面板";
     }
 
-    private static void OpenDataDirectory()
+    private void OpenDataDirectory()
     {
-        var dataDirectory = AppStorage.GetDataDirectory();
-        Directory.CreateDirectory(dataDirectory);
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = dataDirectory,
-            UseShellExecute = true
-        });
+            _services.GetRequiredService<IDataDirectoryService>().OpenDataDirectory();
+        }
+        catch (Exception ex)
+        {
+            _mainVm?.PanelService.ShowMessage(
+                $"无法打开数据目录：{ex.Message}",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void ExitApplication()

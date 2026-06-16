@@ -22,6 +22,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IThemeService _themeService;
     private readonly IAutoStartService _autoStartService;
     private readonly IDataExportService _dataExportService;
+    private readonly IDataDirectoryService _dataDirectoryService;
     private AppSettings _settings;
 
     public PanelService PanelService => _panelService;
@@ -51,7 +52,8 @@ public partial class MainViewModel : ObservableObject
         PanelService panelService,
         IThemeService themeService,
         IAutoStartService autoStartService,
-        IDataExportService dataExportService)
+        IDataExportService dataExportService,
+        IDataDirectoryService dataDirectoryService)
     {
         _dataService = dataService;
         _shellService = shellService;
@@ -59,6 +61,7 @@ public partial class MainViewModel : ObservableObject
         _themeService = themeService;
         _autoStartService = autoStartService;
         _dataExportService = dataExportService;
+        _dataDirectoryService = dataDirectoryService;
 
         _ = LoadDataAsync();
 
@@ -789,7 +792,13 @@ public partial class MainViewModel : ObservableObject
             Owner = owner
         };
         settingsWindow.DataContext = new SettingsViewModel(
-            this, _panelService, _themeService, _autoStartService, _dataExportService, settingsWindow);
+            this,
+            _panelService,
+            _themeService,
+            _autoStartService,
+            _dataExportService,
+            _dataDirectoryService,
+            settingsWindow);
 
         using (_panelService.SuspendAutoHide())
         {

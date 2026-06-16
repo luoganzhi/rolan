@@ -1,9 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
-using System.Diagnostics;
-using System.IO;
-using Rolan.Helpers;
 using Rolan.Models;
 using Rolan.Services;
 
@@ -35,6 +32,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IThemeService _themeService;
     private readonly IAutoStartService _autoStartService;
     private readonly IDataExportService _dataExportService;
+    private readonly IDataDirectoryService _dataDirectoryService;
     private readonly AppSettings _settings;
     private readonly System.Windows.Window? _owner;
 
@@ -75,7 +73,7 @@ public partial class SettingsViewModel : ObservableObject
     public string[] PanelSides { get; } = { "左侧", "右侧" };
     public string[] HotkeyModifierOptions { get; } = ModifierChoices.Select(c => c.Label).ToArray();
     public string[] HotkeyKeyOptions { get; } = KeyChoices.Select(c => c.Label).ToArray();
-    public string DataDirectory { get; } = AppStorage.GetDataDirectory();
+    public string DataDirectory => _dataDirectoryService.DataDirectory;
 
     public SettingsViewModel(
         MainViewModel mainVm,
@@ -83,6 +81,7 @@ public partial class SettingsViewModel : ObservableObject
         IThemeService themeService,
         IAutoStartService autoStartService,
         IDataExportService dataExportService,
+        IDataDirectoryService dataDirectoryService,
         System.Windows.Window? owner = null)
     {
         _mainVm = mainVm;
@@ -90,6 +89,7 @@ public partial class SettingsViewModel : ObservableObject
         _themeService = themeService;
         _autoStartService = autoStartService;
         _dataExportService = dataExportService;
+        _dataDirectoryService = dataDirectoryService;
         _owner = owner;
         _settings = AppSettings.Load();
 
@@ -142,12 +142,17 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void OpenDataDirectory()
     {
-        Directory.CreateDirectory(DataDirectory);
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = DataDirectory,
-            UseShellExecute = true
-        });
+            _dataDirectoryService.OpenDataDirectory();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(
+                $"无法打开数据目录：{ex.Message}",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+        }
     }
 
     [RelayCommand]

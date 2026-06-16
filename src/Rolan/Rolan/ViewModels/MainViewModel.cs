@@ -173,16 +173,24 @@ public partial class MainViewModel : ObservableObject
 
     private static bool MatchesSearch(ShortcutItem item, string searchText)
     {
-        var normalizedSearchText = searchText.Trim();
-        return Contains(item.Name, normalizedSearchText)
-               || ContainsSearchAlias(item.Name, normalizedSearchText)
-               || Contains(item.TargetPath, normalizedSearchText)
-               || ContainsSearchAlias(item.TargetPath, normalizedSearchText)
-               || Contains(item.Arguments, normalizedSearchText)
-               || ContainsSearchAlias(item.Arguments, normalizedSearchText)
-               || Contains(item.WorkingDirectory, normalizedSearchText)
-               || ContainsSearchAlias(item.WorkingDirectory, normalizedSearchText)
-               || Contains(item.Type.ToString(), normalizedSearchText);
+        var searchTerms = SplitSearchTerms(searchText);
+        return searchTerms.Length == 0 || searchTerms.All(term => MatchesSearchTerm(item, term));
+    }
+
+    private static string[] SplitSearchTerms(string searchText)
+        => searchText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static bool MatchesSearchTerm(ShortcutItem item, string searchTerm)
+    {
+        return Contains(item.Name, searchTerm)
+               || ContainsSearchAlias(item.Name, searchTerm)
+               || Contains(item.TargetPath, searchTerm)
+               || ContainsSearchAlias(item.TargetPath, searchTerm)
+               || Contains(item.Arguments, searchTerm)
+               || ContainsSearchAlias(item.Arguments, searchTerm)
+               || Contains(item.WorkingDirectory, searchTerm)
+               || ContainsSearchAlias(item.WorkingDirectory, searchTerm)
+               || Contains(item.Type.ToString(), searchTerm);
     }
 
     private static bool Contains(string? value, string searchText)

@@ -75,7 +75,11 @@ public partial class App : System.Windows.Application
 
         CreateTrayIcon();
         if (ShouldStartMinimized(e.Args))
+        {
+            _mainWindow.Opacity = 0;
+            _mainWindow.ShowActivated = false;
             _mainWindow.Loaded += HideMainWindowAfterStartup;
+        }
 
         _mainWindow.Show();
     }
@@ -151,16 +155,21 @@ public partial class App : System.Windows.Application
         if (_mainWindow == null) return;
 
         _mainWindow.Show();
+        if (_mainWindow.WindowState == WindowState.Minimized)
+            _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
         if (_mainVm?.PanelService.IsHidden == true)
             _mainVm.PanelService.AnimateShow();
-        _mainWindow.FocusSearchBox();
+        _mainWindow.RequestSearchFocus();
         UpdateTrayMenuText();
     }
 
     private void OnMainWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         // 防止直接关闭，改为隐藏到托盘
+        if (_isExiting)
+            return;
+
         e.Cancel = true;
         _mainWindow?.Hide();
     }
@@ -171,6 +180,8 @@ public partial class App : System.Windows.Application
 
         _mainWindow.Loaded -= HideMainWindowAfterStartup;
         _mainWindow.Hide();
+        _mainWindow.Opacity = 1;
+        _mainWindow.ShowActivated = true;
         UpdateTrayMenuText();
     }
 

@@ -108,7 +108,7 @@ public partial class MainWindow : Window
         SearchBox.SelectAll();
     }
 
-    private void RequestSearchFocus()
+    public void RequestSearchFocus()
     {
         _ = Dispatcher.BeginInvoke(FocusSearchBox, DispatcherPriority.Input);
         _ = Dispatcher.BeginInvoke(FocusSearchBox, DispatcherPriority.ContextIdle);

@@ -781,9 +781,11 @@ public partial class MainViewModel : ObservableObject
     {
         var settingsWindow = new Views.SettingsWindow
         {
-            Owner = owner,
-            DataContext = new SettingsViewModel(this, _panelService, _themeService, _autoStartService, _dataExportService)
+            Owner = owner
         };
+        settingsWindow.DataContext = new SettingsViewModel(
+            this, _panelService, _themeService, _autoStartService, _dataExportService, settingsWindow);
+
         using (_panelService.SuspendAutoHide())
         {
             settingsWindow.ShowDialog();

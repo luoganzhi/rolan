@@ -36,6 +36,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IAutoStartService _autoStartService;
     private readonly IDataExportService _dataExportService;
     private readonly AppSettings _settings;
+    private readonly System.Windows.Window? _owner;
 
     [ObservableProperty]
     private bool _autoHide;
@@ -81,13 +82,15 @@ public partial class SettingsViewModel : ObservableObject
         PanelService panelService,
         IThemeService themeService,
         IAutoStartService autoStartService,
-        IDataExportService dataExportService)
+        IDataExportService dataExportService,
+        System.Windows.Window? owner = null)
     {
         _mainVm = mainVm;
         _panelService = panelService;
         _themeService = themeService;
         _autoStartService = autoStartService;
         _dataExportService = dataExportService;
+        _owner = owner;
         _settings = AppSettings.Load();
 
         _autoHide = _settings.AutoHide;
@@ -160,7 +163,7 @@ public partial class SettingsViewModel : ObservableObject
         bool? dialogResult;
         using (_panelService.SuspendAutoHide())
         {
-            dialogResult = dialog.ShowDialog();
+            dialogResult = dialog.ShowDialog(_owner);
         }
 
         if (dialogResult == true)
@@ -169,7 +172,7 @@ public partial class SettingsViewModel : ObservableObject
             await _dataExportService.ExportAsync(dialog.FileName, groups);
             using (_panelService.SuspendAutoHide())
             {
-                System.Windows.MessageBox.Show("导出成功！", "Rolan");
+                ShowMessage("导出成功！", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             }
         }
     }
@@ -185,7 +188,7 @@ public partial class SettingsViewModel : ObservableObject
         bool? dialogResult;
         using (_panelService.SuspendAutoHide())
         {
-            dialogResult = dialog.ShowDialog();
+            dialogResult = dialog.ShowDialog(_owner);
         }
 
         if (dialogResult == true)
@@ -195,19 +198,27 @@ public partial class SettingsViewModel : ObservableObject
                 await _mainVm.ImportDataAsync(dialog.FileName);
                 using (_panelService.SuspendAutoHide())
                 {
-                    System.Windows.MessageBox.Show("导入成功！", "Rolan");
+                    ShowMessage("导入成功！", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
                 using (_panelService.SuspendAutoHide())
                 {
-                    System.Windows.MessageBox.Show($"导入失败: {ex.Message}", "Rolan",
+                    ShowMessage($"导入失败: {ex.Message}",
                         System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 }
             }
         }
     }
+
+    private System.Windows.MessageBoxResult ShowMessage(
+        string message,
+        System.Windows.MessageBoxButton buttons,
+        System.Windows.MessageBoxImage image)
+        => _owner == null
+            ? System.Windows.MessageBox.Show(message, "Rolan", buttons, image)
+            : System.Windows.MessageBox.Show(_owner, message, "Rolan", buttons, image);
 
     private static int FindChoiceIndex(HotkeyChoice[] choices, int value)
     {

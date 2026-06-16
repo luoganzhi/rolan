@@ -725,8 +725,8 @@ public partial class MainWindow : Window
     {
         using (ViewModel?.PanelService.SuspendAutoHide())
         {
-            if (System.Windows.MessageBox.Show($"确认删除快捷方式 \"{item.Name}\"？",
-                    "Rolan", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning) ==
+            if (ShowMessage($"确认删除快捷方式 \"{item.Name}\"？",
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning) ==
                 System.Windows.MessageBoxResult.Yes)
             {
                 ViewModel?.DeleteShortcutCommand.Execute(item);
@@ -927,8 +927,7 @@ public partial class MainWindow : Window
                 ? System.Windows.MessageBoxButton.YesNoCancel
                 : System.Windows.MessageBoxButton.YesNo;
 
-            var result = System.Windows.MessageBox.Show(message,
-                "Rolan", buttons, System.Windows.MessageBoxImage.Warning);
+            var result = ShowMessage(message, buttons, System.Windows.MessageBoxImage.Warning);
             if (result is System.Windows.MessageBoxResult.Cancel or System.Windows.MessageBoxResult.None)
                 return;
 
@@ -1069,9 +1068,9 @@ public partial class MainWindow : Window
                 settings.HotkeyModifiers = newRegistration.Modifiers;
                 settings.HotkeyKey = newRegistration.Key;
                 settings.Save();
-                System.Windows.MessageBox.Show(
+                ShowMessage(
                     $"Alt + Space 已被占用，已改用 {FormatHotkey(newRegistration.Modifiers, newRegistration.Key)}。",
-                    "Rolan", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             }
             return;
         }
@@ -1084,13 +1083,13 @@ public partial class MainWindow : Window
             settings.HotkeyModifiers = previousModifiers;
             settings.HotkeyKey = previousKey;
             settings.Save();
-            System.Windows.MessageBox.Show(
+            ShowMessage(
                 $"新热键注册失败，已恢复为 {FormatHotkey(previousModifiers, previousKey)}。",
-                "Rolan", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             return;
         }
 
-        System.Windows.MessageBox.Show("全局热键注册失败，快捷键可能已被其他程序占用。", "Rolan",
+        ShowMessage("全局热键注册失败，快捷键可能已被其他程序占用。",
             System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
     }
 
@@ -1106,7 +1105,7 @@ public partial class MainWindow : Window
         _isHotkeyRegistered = false;
         if (!_isHotkeyRegistered)
         {
-            System.Windows.MessageBox.Show("全局热键注册失败，快捷键可能已被其他程序占用。", "Rolan",
+            ShowMessage("全局热键注册失败，快捷键可能已被其他程序占用。",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         }
     }
@@ -1198,7 +1197,7 @@ public partial class MainWindow : Window
         return owner as ContextMenu;
     }
 
-    private static void CopyTextToClipboard(string text)
+    private void CopyTextToClipboard(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
@@ -1209,10 +1208,16 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"无法写入剪贴板：{ex.Message}", "Rolan",
+            ShowMessage($"无法写入剪贴板：{ex.Message}",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         }
     }
+
+    private System.Windows.MessageBoxResult ShowMessage(
+        string message,
+        System.Windows.MessageBoxButton buttons,
+        System.Windows.MessageBoxImage image)
+        => System.Windows.MessageBox.Show(this, message, "Rolan", buttons, image);
 
     private static string BuildCommandLine(ShortcutItem item)
     {

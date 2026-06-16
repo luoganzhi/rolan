@@ -107,19 +107,19 @@ public partial class App : System.Windows.Application
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("添加分组", null, (_, _) =>
         {
-            ShowMainWindow();
+            ShowMainWindow(focusSearchBox: false);
             _ = _mainWindow?.AddGroupWithNameAsync();
         });
         menu.Items.Add("打开数据目录", null, (_, _) => OpenDataDirectory());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("设置", null, (_, _) =>
         {
-            ShowMainWindow();
+            ShowMainWindow(focusSearchBox: false);
             _mainVm?.OpenSettingsCommand.Execute(_mainWindow);
         });
         menu.Items.Add("关于", null, (_, _) =>
         {
-            ShowMainWindow();
+            ShowMainWindow(focusSearchBox: false);
             var about = new AboutWindow
             {
                 Owner = _mainWindow
@@ -150,17 +150,20 @@ public partial class App : System.Windows.Application
     private void ShowMainWindowFromExternalSignal()
         => ShowMainWindow();
 
-    private void ShowMainWindow()
+    private void ShowMainWindow(bool focusSearchBox = true)
     {
         if (_mainWindow == null) return;
 
+        _mainWindow.Opacity = 1;
+        _mainWindow.ShowActivated = true;
         _mainWindow.Show();
         if (_mainWindow.WindowState == WindowState.Minimized)
             _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
         if (_mainVm?.PanelService.IsHidden == true)
             _mainVm.PanelService.AnimateShow();
-        _mainWindow.RequestSearchFocus();
+        if (focusSearchBox)
+            _mainWindow.RequestSearchFocus();
         UpdateTrayMenuText();
     }
 

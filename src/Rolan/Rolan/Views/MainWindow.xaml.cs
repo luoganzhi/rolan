@@ -774,23 +774,48 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void OpenFileLocation(ShortcutItem item)
+    private void OpenFileLocation(ShortcutItem item)
     {
-        try
+        using (ViewModel?.PanelService.SuspendAutoHide())
         {
-            var resolvedTargetPath = TargetPathHelper.Resolve(item.TargetPath);
-            if (Directory.Exists(resolvedTargetPath))
+            try
             {
-                System.Diagnostics.Process.Start("explorer.exe", $"\"{resolvedTargetPath}\"");
+                var resolvedTargetPath = TargetPathHelper.Resolve(item.TargetPath);
+                if (Directory.Exists(resolvedTargetPath))
+                {
+                    StartExplorer($"\"{resolvedTargetPath}\"");
+                    return;
+                }
+
+                if (File.Exists(resolvedTargetPath))
+                {
+                    var dir = Path.GetDirectoryName(resolvedTargetPath);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    {
+                        StartExplorer($"/select,\"{resolvedTargetPath}\"");
+                        return;
+                    }
+                }
+
+                ShowMessage($"找不到目标位置：{item.TargetPath}",
+                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             }
-            else if (File.Exists(resolvedTargetPath))
+            catch (Exception ex)
             {
-                var dir = Path.GetDirectoryName(resolvedTargetPath);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{resolvedTargetPath}\"");
+                ShowMessage($"无法打开文件位置：{ex.Message}",
+                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             }
         }
-        catch { }
+    }
+
+    private static void StartExplorer(string arguments)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = arguments,
+            UseShellExecute = true
+        });
     }
 
     private static bool CanOpenFileLocation(ShortcutItem item)

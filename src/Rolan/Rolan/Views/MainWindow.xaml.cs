@@ -353,7 +353,7 @@ public partial class MainWindow : Window
             if (!System.Windows.Clipboard.ContainsText())
                 return false;
 
-            targets = ParseShortcutTargetsFromClipboardText(System.Windows.Clipboard.GetText());
+            targets = ParseShortcutTargetsFromText(System.Windows.Clipboard.GetText());
             return targets.Length > 0;
         }
         catch
@@ -362,7 +362,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string[] ParseShortcutTargetsFromClipboardText(string? text)
+    private static string[] ParseShortcutTargetsFromText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return [];
@@ -377,6 +377,19 @@ public partial class MainWindow : Window
         return targets.Length > 0 && targets.All(LooksLikeShortcutTarget)
             ? targets
             : [];
+    }
+
+    private static string[] ParseShortcutTargetsFromDragDropText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return [];
+
+        var targets = ParseShortcutTargetsFromText(text);
+        if (targets.Length > 0)
+            return targets;
+
+        var normalized = TargetPathHelper.NormalizeInput(text);
+        return string.IsNullOrWhiteSpace(normalized) ? [] : [normalized];
     }
 
     private static bool LooksLikeShortcutTarget(string target)
@@ -539,7 +552,13 @@ public partial class MainWindow : Window
         {
             var text = e.Data.GetData(System.Windows.DataFormats.Text) as string;
             if (!string.IsNullOrWhiteSpace(text) && ViewModel != null)
-                await ViewModel.AddShortcutCommand.ExecuteAsync(text);
+            {
+                foreach (var target in ParseShortcutTargetsFromDragDropText(text))
+                    await ViewModel.AddShortcutCommand.ExecuteAsync(target);
+
+                ScrollSelectedShortcutIntoView();
+            }
+
             e.Handled = true;
         }
     }

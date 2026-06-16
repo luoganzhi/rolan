@@ -334,7 +334,15 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        await LaunchItem(SelectedShortcut ?? GetFilteredItems().FirstOrDefault());
+        var item = SelectedShortcut ?? GetFilteredItems().FirstOrDefault();
+        if (item != null)
+        {
+            await LaunchItem(item);
+            return;
+        }
+
+        if (TryNormalizeDirectLaunchTarget(query, out var targetPath) && _shellService.Launch(targetPath))
+            SearchText = string.Empty;
     }
 
     [RelayCommand]
@@ -1074,6 +1082,42 @@ public partial class MainViewModel : ObservableObject
             ? $"https://www.google.com/search?q={escaped}"
             : $"https://www.baidu.com/s?wd={escaped}";
         return true;
+    }
+
+    private static bool TryNormalizeDirectLaunchTarget(string query, out string targetPath)
+    {
+        targetPath = string.Empty;
+        var normalized = TargetPathHelper.NormalizeInput(query);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return false;
+
+        if (SystemCommandHelper.IsSystemCommand(normalized))
+        {
+            targetPath = normalized;
+            return true;
+        }
+
+        if (TargetPathHelper.IsUrl(normalized) && !normalized.Any(char.IsWhiteSpace))
+        {
+            targetPath = normalized;
+            return true;
+        }
+
+        try
+        {
+            var resolved = TargetPathHelper.Resolve(normalized);
+            if (File.Exists(resolved) || Directory.Exists(resolved))
+            {
+                targetPath = normalized;
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        return false;
     }
 
     private static string GetShortcutName(string path, ShortcutType type)

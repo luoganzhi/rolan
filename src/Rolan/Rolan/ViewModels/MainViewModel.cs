@@ -319,8 +319,7 @@ public partial class MainViewModel : ObservableObject
         await _dataService.RecordItemLaunchAsync(item.Id, item.LaunchCount, item.LastLaunchedAt.Value);
         RefreshFilteredItems();
 
-        if (_settings.HideAfterLaunch && !_panelService.IsHidden)
-            _panelService.AnimateHide();
+        CompleteSuccessfulLaunch(clearSearchText: false);
     }
 
     [RelayCommand]
@@ -329,8 +328,8 @@ public partial class MainViewModel : ObservableObject
         var query = SearchText.Trim();
         if (TryBuildSearchUrl(query, out var searchUrl))
         {
-            _shellService.Launch(searchUrl);
-            SearchText = string.Empty;
+            if (_shellService.Launch(searchUrl))
+                CompleteSuccessfulLaunch(clearSearchText: true);
             return;
         }
 
@@ -342,7 +341,16 @@ public partial class MainViewModel : ObservableObject
         }
 
         if (TryNormalizeDirectLaunchTarget(query, out var targetPath) && _shellService.Launch(targetPath))
+            CompleteSuccessfulLaunch(clearSearchText: true);
+    }
+
+    private void CompleteSuccessfulLaunch(bool clearSearchText)
+    {
+        if (clearSearchText)
             SearchText = string.Empty;
+
+        if (_settings.HideAfterLaunch && !_panelService.IsHidden)
+            _panelService.AnimateHide();
     }
 
     [RelayCommand]

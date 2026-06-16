@@ -273,7 +273,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.V && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
+        if (e.Key == Key.V && !IsSearchTextPasteShortcut() && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
         {
             e.Handled = true;
             await AddClipboardShortcutTargetsAsync(clipboardTargets);
@@ -454,6 +454,9 @@ public partial class MainWindow : Window
         => SearchBox.SelectionLength > 0 &&
            e.Key == Key.C &&
            Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
+    private bool IsSearchTextPasteShortcut()
+        => Keyboard.FocusedElement == SearchBox && SearchBox.SelectionLength > 0;
 
     private void OnShortcutGridSelectionChanged(object sender, SelectionChangedEventArgs e)
         => ScrollSelectedShortcutIntoView();

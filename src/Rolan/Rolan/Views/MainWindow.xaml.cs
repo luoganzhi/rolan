@@ -417,6 +417,9 @@ public partial class MainWindow : Window
 
     private void OnSearchKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        if (IsSearchTextCopyShortcut(e))
+            return;
+
         if (HandleSelectedShortcutKey(e, allowPlainDelete: string.IsNullOrEmpty(SearchBox.Text)))
             return;
 
@@ -439,6 +442,11 @@ public partial class MainWindow : Window
                 break;
         }
     }
+
+    private bool IsSearchTextCopyShortcut(System.Windows.Input.KeyEventArgs e)
+        => SearchBox.SelectionLength > 0 &&
+           e.Key == Key.C &&
+           Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
     private void OnShortcutGridSelectionChanged(object sender, SelectionChangedEventArgs e)
         => ScrollSelectedShortcutIntoView();

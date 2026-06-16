@@ -212,21 +212,32 @@ public partial class MainWindow : Window
         };
     }
 
-    private void OnWindowPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private async void OnWindowPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (Keyboard.Modifiers == ModifierKeys.Alt)
         {
             var shortcutIndex = TryGetIndexFromKey(e.SystemKey);
             if (shortcutIndex >= 0)
             {
-                ViewModel?.LaunchFilteredItemByIndexCommand.Execute(shortcutIndex);
                 e.Handled = true;
+
+                if (ViewModel != null)
+                    await ViewModel.LaunchFilteredItemByIndexCommand.ExecuteAsync(shortcutIndex);
+
                 return;
             }
         }
 
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             return;
+
+        if (e.Key == Key.V && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
+        {
+            e.Handled = true;
+            await AddClipboardShortcutTargetsAsync(clipboardTargets);
+            _ = Dispatcher.BeginInvoke(FocusSearchBox);
+            return;
+        }
 
         if (e.Key == Key.Tab)
         {
@@ -235,7 +246,7 @@ public partial class MainWindow : Window
             else
                 ViewModel?.SelectNextGroupCommand.Execute(null);
 
-            Dispatcher.BeginInvoke(FocusSearchBox);
+            _ = Dispatcher.BeginInvoke(FocusSearchBox);
             e.Handled = true;
             return;
         }
@@ -244,7 +255,7 @@ public partial class MainWindow : Window
         if (groupIndex >= 0)
         {
             ViewModel?.SelectGroupByIndexCommand.Execute(groupIndex);
-            Dispatcher.BeginInvoke(FocusSearchBox);
+            _ = Dispatcher.BeginInvoke(FocusSearchBox);
             e.Handled = true;
         }
     }
@@ -275,6 +286,85 @@ public partial class MainWindow : Window
             return key - Key.NumPad1;
 
         return -1;
+    }
+
+    private async Task AddClipboardShortcutTargetsAsync(string[] targets)
+    {
+        if (ViewModel == null)
+            return;
+
+        foreach (var target in targets)
+            await ViewModel.AddShortcutCommand.ExecuteAsync(target);
+
+        ScrollSelectedShortcutIntoView();
+    }
+
+    private static bool TryGetShortcutTargetsFromClipboard(out string[] targets)
+    {
+        targets = [];
+
+        try
+        {
+            if (System.Windows.Clipboard.ContainsFileDropList())
+            {
+                targets = System.Windows.Clipboard.GetFileDropList()
+                    .Cast<string>()
+                    .Where(target => !string.IsNullOrWhiteSpace(target))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                return targets.Length > 0;
+            }
+
+            if (!System.Windows.Clipboard.ContainsText())
+                return false;
+
+            targets = ParseShortcutTargetsFromClipboardText(System.Windows.Clipboard.GetText());
+            return targets.Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string[] ParseShortcutTargetsFromClipboardText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return [];
+
+        var targets = text.Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries)
+            .Select(TargetPathHelper.NormalizeInput)
+            .OfType<string>()
+            .Where(target => !string.IsNullOrWhiteSpace(target))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return targets.Length > 0 && targets.All(LooksLikeShortcutTarget)
+            ? targets
+            : [];
+    }
+
+    private static bool LooksLikeShortcutTarget(string target)
+    {
+        if (SystemCommandHelper.IsSystemCommand(target))
+            return true;
+
+        if (TargetPathHelper.IsUrl(target) && !target.Any(char.IsWhiteSpace))
+            return true;
+
+        try
+        {
+            var expanded = Environment.ExpandEnvironmentVariables(target);
+            if (Path.IsPathFullyQualified(expanded))
+                return File.Exists(expanded) || Directory.Exists(expanded);
+
+            var resolved = TargetPathHelper.Resolve(target);
+            return File.Exists(resolved) || Directory.Exists(resolved);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void OnSearchKeyDown(object sender, System.Windows.Input.KeyEventArgs e)

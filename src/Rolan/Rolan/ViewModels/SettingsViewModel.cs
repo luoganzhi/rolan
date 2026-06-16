@@ -56,6 +56,9 @@ public partial class SettingsViewModel : ObservableObject
     private bool _hideAfterLaunch;
 
     [ObservableProperty]
+    private bool _autoFitPanelHeight;
+
+    [ObservableProperty]
     private string _selectedTheme;
 
     [ObservableProperty]
@@ -93,6 +96,7 @@ public partial class SettingsViewModel : ObservableObject
         _topMost = _settings.TopMost;
         _autoStart = _autoStartService.IsEnabled;
         _hideAfterLaunch = _settings.HideAfterLaunch;
+        _autoFitPanelHeight = _settings.AutoFitPanelHeight;
         _selectedTheme = _settings.Theme;
         _selectedPanelSideIndex = (int)_settings.PanelSide;
         _selectedHotkeyModifierIndex = FindChoiceIndex(ModifierChoices, _settings.HotkeyModifiers);
@@ -112,6 +116,7 @@ public partial class SettingsViewModel : ObservableObject
         _settings.TopMost = TopMost;
         _settings.AutoStart = AutoStart;
         _settings.HideAfterLaunch = HideAfterLaunch;
+        _settings.AutoFitPanelHeight = AutoFitPanelHeight;
         _settings.Theme = SelectedTheme;
         _settings.PanelSide = (PanelSide)SelectedPanelSideIndex;
         _settings.HotkeyModifiers = GetChoiceValue(ModifierChoices, SelectedHotkeyModifierIndex);

@@ -12,7 +12,7 @@ public enum PanelSide
 
 public class AppSettings
 {
-    private const int CurrentSettingsVersion = 5;
+    private const int CurrentSettingsVersion = 6;
 
     public int SettingsVersion { get; set; } = CurrentSettingsVersion;
     public bool AutoHide { get; set; }
@@ -26,6 +26,7 @@ public class AppSettings
     public int PanelWidth { get; set; } = 360;
     public int PanelHeight { get; set; } = 720;
     public double? PanelTop { get; set; }
+    public bool AutoFitPanelHeight { get; set; } = true;
     public bool AutoStart { get; set; }
     public bool HideAfterLaunch { get; set; } = true;
 
@@ -93,9 +94,12 @@ public class AppSettings
             HotkeyKey = 0x20;
         }
 
+        if (existingVersion < 6)
+            AutoFitPanelHeight = true;
+
         SettingsVersion = CurrentSettingsVersion;
         PanelWidth = Math.Clamp(PanelWidth, 280, 720);
-        PanelHeight = Math.Clamp(PanelHeight, 420, 1400);
+        PanelHeight = Math.Clamp(PanelHeight, 240, 1400);
         if (PanelTop is double top && (double.IsNaN(top) || double.IsInfinity(top)))
             PanelTop = null;
     }

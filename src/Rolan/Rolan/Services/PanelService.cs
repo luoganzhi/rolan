@@ -28,7 +28,7 @@ public class PanelService
     private const int PanelMargin = 12;
     private const int MinPanelWidth = 280;
     private const int MaxPanelWidth = 720;
-    private const int MinPanelHeight = 420;
+    private const int MinPanelHeight = 240;
     private const int SlideStepPx = 16;
     private const int SlideIntervalMs = 10;
     private const int EdgePollIntervalMs = 200;
@@ -348,6 +348,14 @@ public class PanelService
         SavePlacementNow();
     }
 
+    public void FitHeightToContent(double desiredHeight)
+    {
+        if (_window == null || _sliding || _positioning || !_settings.AutoFitPanelHeight)
+            return;
+
+        ApplyHeight(desiredHeight);
+    }
+
     public IDisposable SuspendAutoHide()
     {
         _autoHideSuppressionCount++;
@@ -458,6 +466,41 @@ public class PanelService
         _settings.PanelHeight = (int)Math.Round(height);
         _settings.PanelTop = top;
         _settings.Save();
+    }
+
+    private void ApplyHeight(double desiredHeight)
+    {
+        if (_window == null || double.IsNaN(desiredHeight) || double.IsInfinity(desiredHeight))
+            return;
+
+        var (waX, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
+        var maxHeight = GetMaxPanelHeight(waHeight);
+        var height = Clamp(desiredHeight, Math.Min(MinPanelHeight, maxHeight), maxHeight);
+        if (Math.Abs(_window.Height - height) < 1)
+            return;
+
+        var top = Clamp(_window.Top, waY, GetMaxPanelTop(waY, waHeight, height));
+
+        _positioning = true;
+        try
+        {
+            ApplyWindowLimits();
+            _window.Height = height;
+            _window.Top = top;
+            _window.Left = _isHidden
+                ? (_settings.PanelSide == PanelSide.Left
+                    ? waX - _window.Width + HiddenEdgeWidth
+                    : waX + waWidth - HiddenEdgeWidth)
+                : (_settings.PanelSide == PanelSide.Left
+                    ? waX
+                    : waX + waWidth - _window.Width);
+        }
+        finally
+        {
+            _positioning = false;
+        }
+
+        _settings.PanelTop = top;
     }
 
     private static double GetMaxPanelWidth(double workingAreaWidth)

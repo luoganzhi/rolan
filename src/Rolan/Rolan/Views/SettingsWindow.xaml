@@ -57,6 +57,7 @@
                         <ComboBox ItemsSource="{Binding PanelSides}"
                                   SelectedIndex="{Binding SelectedPanelSideIndex, Mode=TwoWay}" />
                     </StackPanel>
+                    <CheckBox IsChecked="{Binding AutoFitPanelHeight}" Content="按内容自动调整面板高度" />
                 </StackPanel>
             </Border>
 

@@ -1,4 +1,5 @@
 using System.IO;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -22,6 +23,11 @@ public partial class MainWindow : Window
     private const int DefaultHotkeyKey = 0x20;    // Space
     private const int FallbackHotkeyModifiers = 1 | 2; // Ctrl + Alt
     private const int FallbackHotkeyKey = 0x52;        // R
+    private const double ShortcutTileWidth = 76;
+    private const double ShortcutTileHeight = 96;
+    private const double PanelChromeHeight = 110;
+    private const double EmptyContentHeight = 56;
+    private const double ContentHeightPadding = 28;
 
     private readonly IHotkeyService _hotkeyService;
     private IntPtr _windowHandle;
@@ -33,6 +39,8 @@ public partial class MainWindow : Window
     private ShortcutItem? _pendingShortcutDragItem;
     private ShortcutGroup? _pendingGroupDragItem;
     private DateTime _lastShortcutDragCompleted = DateTime.MinValue;
+    private bool _fittingPanelHeight;
+    private bool _isPanelHeightFitAttached;
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
     public MainWindow(IHotkeyService hotkeyService)
@@ -63,6 +71,8 @@ public partial class MainWindow : Window
         vm.PanelService.PositionPanel();
         vm.PanelService.SetMousePenetration(settings.MousePenetration);
         vm.PanelService.SetTopMost(settings.TopMost);
+        vm.PropertyChanged += OnViewModelPropertyChanged;
+        Loaded += OnMainWindowLoaded;
         FocusSearchBox();
     }
 
@@ -80,6 +90,31 @@ public partial class MainWindow : Window
     {
         SearchBox.Focus();
         SearchBox.SelectAll();
+    }
+
+    private void OnMainWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        if (!_isPanelHeightFitAttached)
+        {
+            SizeChanged += OnMainWindowSizeChanged;
+            _isPanelHeightFitAttached = true;
+        }
+
+        ScheduleFitPanelHeightToContent();
+    }
+
+    private void OnMainWindowSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!e.WidthChanged || _fittingPanelHeight)
+            return;
+
+        ScheduleFitPanelHeightToContent();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainViewModel.FilteredItems) or nameof(MainViewModel.HasNoFilteredItems))
+            ScheduleFitPanelHeightToContent();
     }
 
     // ---- 鼠标面板事件 ----
@@ -860,6 +895,44 @@ public partial class MainWindow : Window
             ShortcutGrid.ScrollIntoView(item);
     }
 
+    private void ScheduleFitPanelHeightToContent()
+    {
+        if (!IsLoaded)
+            return;
+
+        _ = Dispatcher.BeginInvoke(FitPanelHeightToContent);
+    }
+
+    private void FitPanelHeightToContent()
+    {
+        if (ViewModel == null)
+            return;
+
+        var desiredHeight = CalculateDesiredPanelHeight();
+        _fittingPanelHeight = true;
+        try
+        {
+            ViewModel.PanelService.FitHeightToContent(desiredHeight);
+        }
+        finally
+        {
+            _fittingPanelHeight = false;
+        }
+    }
+
+    private double CalculateDesiredPanelHeight()
+    {
+        var itemCount = ShortcutGrid.Items.Count;
+        var availableGridWidth = Math.Max(ShortcutTileWidth, ShortcutGrid.ActualWidth - ShortcutGrid.Padding.Left - ShortcutGrid.Padding.Right);
+        var columns = Math.Max(1, (int)Math.Floor(availableGridWidth / ShortcutTileWidth));
+        var rows = itemCount == 0 ? 0 : (int)Math.Ceiling(itemCount / (double)columns);
+        var contentHeight = itemCount == 0
+            ? EmptyContentHeight
+            : rows * ShortcutTileHeight + ContentHeightPadding;
+
+        return PanelChromeHeight + contentHeight;
+    }
+
     private void SuppressAutoHideWhileOpen(ContextMenu menu)
     {
         var autoHideScope = ViewModel?.PanelService.SuspendAutoHide();
@@ -880,12 +953,27 @@ public partial class MainWindow : Window
         if (ViewModel != null)
             ViewModel.SettingsChanged -= OnSettingsChanged;
 
+        if (ViewModel != null)
+            ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+        Loaded -= OnMainWindowLoaded;
+        if (_isPanelHeightFitAttached)
+        {
+            SizeChanged -= OnMainWindowSizeChanged;
+            _isPanelHeightFitAttached = false;
+        }
+
         if (_windowHandle != IntPtr.Zero && _isHotkeyRegistered)
             _hotkeyService.Unregister(_windowHandle, HotkeyId);
     }
 
     private void OnSettingsChanged(AppSettings settings)
     {
+        ViewModel?.PanelService.UpdateSettings(settings);
+        ViewModel?.PanelService.SetMousePenetration(settings.MousePenetration);
+        ViewModel?.PanelService.SetTopMost(settings.TopMost);
+        ScheduleFitPanelHeightToContent();
+
         if (_windowHandle == IntPtr.Zero)
             return;
 

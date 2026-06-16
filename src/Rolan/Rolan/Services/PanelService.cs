@@ -21,7 +21,9 @@ public class PanelService
     private bool _sliding;
     private bool _positioning;
     private double _slideTarget;
+    private double? _pendingDesiredHeight;
     private int _autoHideSuppressionCount;
+    private PanelVisibilityState _visibilityState = PanelVisibilityState.Shown;
 
     private const int TriggerEdgeWidth = 5;
     private const int HiddenEdgeWidth = 3;
@@ -34,7 +36,7 @@ public class PanelService
     private const int EdgePollIntervalMs = 200;
     private const int SavePlacementDelayMs = 350;
 
-    public bool IsHidden => _isHidden;
+    public bool IsHidden => _visibilityState is PanelVisibilityState.Hidden or PanelVisibilityState.Hiding;
     public event Action? VisibilityChanged;
 
     public PanelService()
@@ -141,6 +143,8 @@ public class PanelService
         {
             _positioning = false;
         }
+
+        ApplyPendingHeight();
     }
 
     public void CheckAutoHide()
@@ -181,8 +185,16 @@ public class PanelService
 
     public void AnimateHide()
     {
-        if (_window == null || _isHidden || IsAutoHideSuppressed()) return;
+        if (_window == null ||
+            _visibilityState is PanelVisibilityState.Hidden or PanelVisibilityState.Hiding ||
+            IsAutoHideSuppressed())
+        {
+            return;
+        }
+
         StopSlide();
+        _visibilityState = PanelVisibilityState.Hiding;
+        _isHidden = false;
 
         var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
         _slideTarget = _settings.PanelSide == PanelSide.Left
@@ -192,6 +204,7 @@ public class PanelService
         StartSlideTowards(_slideTarget, onComplete: () =>
         {
             _isHidden = true;
+            _visibilityState = PanelVisibilityState.Hidden;
             if (_settings.AutoHide)
                 StartEdgeMonitor();
             VisibilityChanged?.Invoke();
@@ -202,7 +215,12 @@ public class PanelService
 
     public void AnimateShow()
     {
-        if (_window == null || !_isHidden) return;
+        if (_window == null ||
+            _visibilityState is PanelVisibilityState.Shown or PanelVisibilityState.Showing)
+        {
+            return;
+        }
+
         StopSlide();
         StopEdgeMonitor();
 
@@ -212,8 +230,10 @@ public class PanelService
             : waX + waWidth - _window.Width;
 
         _isHidden = false;
+        _visibilityState = PanelVisibilityState.Showing;
         StartSlideTowards(_slideTarget, onComplete: () =>
         {
+            _visibilityState = PanelVisibilityState.Shown;
             VisibilityChanged?.Invoke();
         });
     }
@@ -222,7 +242,7 @@ public class PanelService
 
     public void ToggleVisibility()
     {
-        if (_isHidden) AnimateShow();
+        if (IsHidden) AnimateShow();
         else AnimateHide();
     }
 
@@ -232,7 +252,7 @@ public class PanelService
     {
         _isHovering = true;
         StopHideTimer();
-        if (_settings.AutoHide && _isHidden)
+        if (_settings.AutoHide && IsHidden)
             AnimateShow();
     }
 
@@ -295,6 +315,7 @@ public class PanelService
                 _window.Left = targetX;
                 StopSlide();
                 onComplete?.Invoke();
+                ApplyPendingHeight();
                 return;
             }
             _window.Left = current + direction * SlideStepPx;
@@ -330,9 +351,11 @@ public class PanelService
         {
             StopHideTimer();
             StopEdgeMonitor();
-            if (_isHidden)
+            if (IsHidden)
             {
+                StopSlide();
                 _isHidden = false;
+                _visibilityState = PanelVisibilityState.Shown;
                 PositionPanel();
                 VisibilityChanged?.Invoke();
             }
@@ -350,9 +373,16 @@ public class PanelService
 
     public void FitHeightToContent(double desiredHeight)
     {
-        if (_window == null || _sliding || _positioning || !_settings.AutoFitPanelHeight)
+        if (_window == null || !_settings.AutoFitPanelHeight)
             return;
 
+        if (_sliding || _positioning)
+        {
+            _pendingDesiredHeight = desiredHeight;
+            return;
+        }
+
+        _pendingDesiredHeight = null;
         ApplyHeight(desiredHeight);
     }
 
@@ -421,6 +451,8 @@ public class PanelService
         {
             _positioning = false;
         }
+
+        ApplyPendingHeight();
     }
 
     private void SavePlacementDebounced()
@@ -500,7 +532,23 @@ public class PanelService
             _positioning = false;
         }
 
+        _settings.PanelHeight = (int)Math.Round(height);
         _settings.PanelTop = top;
+    }
+
+    private void ApplyPendingHeight()
+    {
+        if (_pendingDesiredHeight is not double desiredHeight ||
+            _window == null ||
+            _sliding ||
+            _positioning ||
+            !_settings.AutoFitPanelHeight)
+        {
+            return;
+        }
+
+        _pendingDesiredHeight = null;
+        ApplyHeight(desiredHeight);
     }
 
     private static double GetMaxPanelWidth(double workingAreaWidth)
@@ -529,5 +577,13 @@ public class PanelService
             var owner = Interlocked.Exchange(ref _owner, null);
             owner?.ResumeAutoHide();
         }
+    }
+
+    private enum PanelVisibilityState
+    {
+        Shown,
+        Hidden,
+        Showing,
+        Hiding
     }
 }

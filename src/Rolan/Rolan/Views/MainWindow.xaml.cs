@@ -1,9 +1,12 @@
+using System.Collections.Specialized;
 using System.IO;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Rolan.Helpers;
 using Rolan.Models;
 using Rolan.Services;
@@ -41,6 +44,7 @@ public partial class MainWindow : Window
     private DateTime _lastShortcutDragCompleted = DateTime.MinValue;
     private bool _fittingPanelHeight;
     private bool _isPanelHeightFitAttached;
+    private bool _panelHeightFitScheduled;
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
     public MainWindow(IHotkeyService hotkeyService)
@@ -68,12 +72,13 @@ public partial class MainWindow : Window
 
         // 绑定面板服务
         vm.PanelService.Attach(this);
+        vm.PanelService.VisibilityChanged += OnPanelVisibilityChanged;
         vm.PanelService.PositionPanel();
         vm.PanelService.SetMousePenetration(settings.MousePenetration);
         vm.PanelService.SetTopMost(settings.TopMost);
         vm.PropertyChanged += OnViewModelPropertyChanged;
         Loaded += OnMainWindowLoaded;
-        FocusSearchBox();
+        RequestSearchFocus();
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -88,8 +93,18 @@ public partial class MainWindow : Window
 
     public void FocusSearchBox()
     {
+        if (!IsVisible || !SearchBox.IsVisible || !SearchBox.IsEnabled)
+            return;
+
         SearchBox.Focus();
+        Keyboard.Focus(SearchBox);
         SearchBox.SelectAll();
+    }
+
+    private void RequestSearchFocus()
+    {
+        _ = Dispatcher.BeginInvoke(FocusSearchBox, DispatcherPriority.Input);
+        _ = Dispatcher.BeginInvoke(FocusSearchBox, DispatcherPriority.ContextIdle);
     }
 
     private void OnMainWindowLoaded(object sender, RoutedEventArgs e)
@@ -97,10 +112,13 @@ public partial class MainWindow : Window
         if (!_isPanelHeightFitAttached)
         {
             SizeChanged += OnMainWindowSizeChanged;
+            ((INotifyCollectionChanged)ShortcutGrid.Items).CollectionChanged += OnShortcutItemsChanged;
+            ShortcutGrid.ItemContainerGenerator.StatusChanged += OnShortcutItemsGeneratorStatusChanged;
             _isPanelHeightFitAttached = true;
         }
 
         ScheduleFitPanelHeightToContent();
+        RequestSearchFocus();
     }
 
     private void OnMainWindowSizeChanged(object sender, SizeChangedEventArgs e)
@@ -117,7 +135,22 @@ public partial class MainWindow : Window
             ScheduleFitPanelHeightToContent();
     }
 
+    private void OnShortcutItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => ScheduleFitPanelHeightToContent();
+
+    private void OnShortcutItemsGeneratorStatusChanged(object? sender, EventArgs e)
+    {
+        if (ShortcutGrid.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated)
+            ScheduleFitPanelHeightToContent();
+    }
+
     // ---- 鼠标面板事件 ----
+
+    private void OnPanelVisibilityChanged()
+    {
+        if (ViewModel?.PanelService.IsHidden == false && IsActive)
+            RequestSearchFocus();
+    }
 
     private void OnPanelMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
         => ViewModel?.PanelService.OnMouseEnter();
@@ -972,14 +1005,16 @@ public partial class MainWindow : Window
 
     private void ScheduleFitPanelHeightToContent()
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _panelHeightFitScheduled)
             return;
 
-        _ = Dispatcher.BeginInvoke(FitPanelHeightToContent);
+        _panelHeightFitScheduled = true;
+        _ = Dispatcher.BeginInvoke(FitPanelHeightToContent, DispatcherPriority.ContextIdle);
     }
 
     private void FitPanelHeightToContent()
     {
+        _panelHeightFitScheduled = false;
         if (ViewModel == null)
             return;
 
@@ -998,7 +1033,10 @@ public partial class MainWindow : Window
     private double CalculateDesiredPanelHeight()
     {
         var itemCount = ShortcutGrid.Items.Count;
-        var availableGridWidth = Math.Max(ShortcutTileWidth, ShortcutGrid.ActualWidth - ShortcutGrid.Padding.Left - ShortcutGrid.Padding.Right);
+        var gridWidth = ShortcutGrid.ActualWidth > 0
+            ? ShortcutGrid.ActualWidth
+            : Math.Max(ShortcutTileWidth, ActualWidth - MainBorder.Margin.Left - MainBorder.Margin.Right);
+        var availableGridWidth = Math.Max(ShortcutTileWidth, gridWidth - ShortcutGrid.Padding.Left - ShortcutGrid.Padding.Right);
         var columns = Math.Max(1, (int)Math.Floor(availableGridWidth / ShortcutTileWidth));
         var rows = itemCount == 0 ? 0 : (int)Math.Ceiling(itemCount / (double)columns);
         var contentHeight = itemCount == 0
@@ -1029,12 +1067,17 @@ public partial class MainWindow : Window
             ViewModel.SettingsChanged -= OnSettingsChanged;
 
         if (ViewModel != null)
+            ViewModel.PanelService.VisibilityChanged -= OnPanelVisibilityChanged;
+
+        if (ViewModel != null)
             ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
         Loaded -= OnMainWindowLoaded;
         if (_isPanelHeightFitAttached)
         {
             SizeChanged -= OnMainWindowSizeChanged;
+            ((INotifyCollectionChanged)ShortcutGrid.Items).CollectionChanged -= OnShortcutItemsChanged;
+            ShortcutGrid.ItemContainerGenerator.StatusChanged -= OnShortcutItemsGeneratorStatusChanged;
             _isPanelHeightFitAttached = false;
         }
 
@@ -1146,20 +1189,28 @@ public partial class MainWindow : Window
 
     private void TogglePanelFromHotkey()
     {
-        if (!IsVisible || !IsActive)
-        {
+        var panelService = ViewModel?.PanelService;
+        var wasHidden = panelService?.IsHidden == true;
+
+        if (!IsVisible)
             Show();
+
+        if (wasHidden)
+        {
             Activate();
-            if (ViewModel?.PanelService.IsHidden == true)
-                ViewModel.PanelService.AnimateShow();
-            FocusSearchBox();
+            panelService?.AnimateShow();
+            RequestSearchFocus();
             return;
         }
 
-        var wasHidden = ViewModel?.PanelService.IsHidden == true;
+        if (!IsActive)
+        {
+            Activate();
+            RequestSearchFocus();
+            return;
+        }
+
         ViewModel?.ToggleVisibilityCommand.Execute(null);
-        if (wasHidden)
-            Dispatcher.BeginInvoke(FocusSearchBox);
     }
 
     private static ShortcutItem? ResolveShortcutItem(MenuItem menuItem)

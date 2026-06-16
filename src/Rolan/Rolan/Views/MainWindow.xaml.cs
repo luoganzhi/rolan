@@ -266,6 +266,13 @@ public partial class MainWindow : Window
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             return;
 
+        if (e.Key == Key.F)
+        {
+            FocusSearchBox();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.V && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
         {
             e.Handled = true;

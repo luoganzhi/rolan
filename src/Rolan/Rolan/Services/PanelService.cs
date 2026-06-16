@@ -22,6 +22,7 @@ public class PanelService
     private bool _positioning;
     private double _slideTarget;
     private double? _pendingDesiredHeight;
+    private WorkingArea? _lastWorkingArea;
     private int _autoHideSuppressionCount;
     private PanelVisibilityState _visibilityState = PanelVisibilityState.Shown;
 
@@ -74,7 +75,7 @@ public class PanelService
 
     private void OnDeactivated(object? sender, EventArgs e)
     {
-        if (_settings.AutoHide && _settings.HideWhenLostFocus && !_isHidden && !IsAutoHideSuppressed())
+        if (_settings.AutoHide && _settings.HideWhenLostFocus && !IsHidden && !IsAutoHideSuppressed())
             AnimateHide();
     }
 
@@ -99,6 +100,7 @@ public class PanelService
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
+        _lastWorkingArea = null;
         _window?.Dispatcher.BeginInvoke(PositionPanel);
     }
 
@@ -114,14 +116,17 @@ public class PanelService
     public void PositionPanel()
     {
         if (_window == null) return;
-        var (waX, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
-        var maxWidth = GetMaxPanelWidth(waWidth);
-        var maxHeight = GetMaxPanelHeight(waHeight);
+        var workingArea = GetWorkingArea(refresh: !IsHidden);
+        var maxWidth = GetMaxPanelWidth(workingArea.Width);
+        var maxHeight = GetMaxPanelHeight(workingArea.Height);
         var minHeight = Math.Min(MinPanelHeight, maxHeight);
         var panelWidth = Clamp(_settings.PanelWidth, MinPanelWidth, maxWidth);
         var panelHeight = Clamp(_settings.PanelHeight, minHeight, maxHeight);
-        var centeredTop = waY + Math.Max(0, (waHeight - panelHeight) / 2);
-        var top = Clamp(_settings.PanelTop ?? centeredTop, waY, GetMaxPanelTop(waY, waHeight, panelHeight));
+        var centeredTop = workingArea.Y + Math.Max(0, (workingArea.Height - panelHeight) / 2);
+        var top = Clamp(
+            _settings.PanelTop ?? centeredTop,
+            workingArea.Y,
+            GetMaxPanelTop(workingArea.Y, workingArea.Height, panelHeight));
 
         _positioning = true;
         try
@@ -130,13 +135,13 @@ public class PanelService
             _window.Width = panelWidth;
             _window.Height = panelHeight;
             _window.Top = top;
-            _window.Left = _isHidden
+            _window.Left = IsHidden
                 ? (_settings.PanelSide == PanelSide.Left
-                    ? waX - panelWidth + HiddenEdgeWidth
-                    : waX + waWidth - HiddenEdgeWidth)
+                    ? workingArea.X - panelWidth + HiddenEdgeWidth
+                    : workingArea.Right - HiddenEdgeWidth)
                 : (_settings.PanelSide == PanelSide.Left
-                    ? waX
-                    : waX + waWidth - panelWidth);
+                    ? workingArea.X
+                    : workingArea.Right - panelWidth);
             _settings.PanelTop = top;
         }
         finally
@@ -152,13 +157,21 @@ public class PanelService
         if (_window == null || !_settings.AutoHide || _isHovering || _sliding || IsAutoHideSuppressed()) return;
 
         var mousePos = WindowHelper.GetCursorPosition(_window);
-        var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
+        var workingArea = GetWorkingArea(refresh: !IsHidden);
+        var panelTop = _window.Top;
+        var panelBottom = _window.Top + _window.Height;
 
         bool nearPanel = _settings.PanelSide == PanelSide.Left
-            ? mousePos.X - waX <= _window.Width + 20 && mousePos.Y >= _window.Top && mousePos.Y <= _window.Top + _window.Height
-            : waX + waWidth - mousePos.X <= _window.Width + 20 && mousePos.Y >= _window.Top && mousePos.Y <= _window.Top + _window.Height;
+            ? mousePos.X >= workingArea.X &&
+              mousePos.X <= workingArea.X + _window.Width + 20 &&
+              mousePos.Y >= panelTop &&
+              mousePos.Y <= panelBottom
+            : mousePos.X <= workingArea.Right &&
+              mousePos.X >= workingArea.Right - _window.Width - 20 &&
+              mousePos.Y >= panelTop &&
+              mousePos.Y <= panelBottom;
 
-        if (!nearPanel && !_isHidden)
+        if (!nearPanel && !IsHidden)
             StartHideTimer();
     }
 
@@ -196,10 +209,10 @@ public class PanelService
         _visibilityState = PanelVisibilityState.Hiding;
         _isHidden = false;
 
-        var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
+        var workingArea = GetWorkingArea(refresh: true);
         _slideTarget = _settings.PanelSide == PanelSide.Left
-            ? waX - _window.Width + HiddenEdgeWidth
-            : waX + waWidth - HiddenEdgeWidth;
+            ? workingArea.X - _window.Width + HiddenEdgeWidth
+            : workingArea.Right - HiddenEdgeWidth;
 
         StartSlideTowards(_slideTarget, onComplete: () =>
         {
@@ -224,10 +237,10 @@ public class PanelService
         StopSlide();
         StopEdgeMonitor();
 
-        var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
+        var workingArea = GetWorkingArea();
         _slideTarget = _settings.PanelSide == PanelSide.Left
-            ? waX
-            : waX + waWidth - _window.Width;
+            ? workingArea.X
+            : workingArea.Right - _window.Width;
 
         _isHidden = false;
         _visibilityState = PanelVisibilityState.Showing;
@@ -259,7 +272,7 @@ public class PanelService
     public void OnMouseLeave()
     {
         _isHovering = false;
-        if (_settings.AutoHide && !_isHidden && !IsAutoHideSuppressed())
+        if (_settings.AutoHide && !IsHidden && !IsAutoHideSuppressed())
             StartHideTimer();
     }
 
@@ -273,15 +286,19 @@ public class PanelService
         {
             if (_window == null || !_isHidden) { StopEdgeMonitor(); return; }
             var mousePos = WindowHelper.GetCursorPosition(_window);
-            var (waX, _, waWidth, _) = WindowHelper.GetWorkingArea(_window);
+            var workingArea = GetWorkingArea();
+            var panelTop = _window.Top;
+            var panelBottom = _window.Top + _window.Height;
 
             bool touchingEdge = _settings.PanelSide == PanelSide.Left
-                ? mousePos.X - waX <= TriggerEdgeWidth
-                  && mousePos.Y >= _window.Top
-                  && mousePos.Y <= _window.Top + _window.Height
-                : waX + waWidth - mousePos.X <= TriggerEdgeWidth
-                  && mousePos.Y >= _window.Top
-                  && mousePos.Y <= _window.Top + _window.Height;
+                ? mousePos.X >= workingArea.X
+                  && mousePos.X <= workingArea.X + TriggerEdgeWidth
+                  && mousePos.Y >= panelTop
+                  && mousePos.Y <= panelBottom
+                : mousePos.X <= workingArea.Right
+                  && mousePos.X >= workingArea.Right - TriggerEdgeWidth
+                  && mousePos.Y >= panelTop
+                  && mousePos.Y <= panelBottom;
 
             if (touchingEdge)
                 AnimateShow();
@@ -409,11 +426,11 @@ public class PanelService
         if (_window == null)
             return;
 
-        var (_, _, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
+        var workingArea = GetWorkingArea(refresh: !IsHidden);
         _window.MinWidth = MinPanelWidth;
-        _window.MaxWidth = GetMaxPanelWidth(waWidth);
-        _window.MinHeight = Math.Min(MinPanelHeight, GetMaxPanelHeight(waHeight));
-        _window.MaxHeight = GetMaxPanelHeight(waHeight);
+        _window.MaxWidth = GetMaxPanelWidth(workingArea.Width);
+        _window.MinHeight = Math.Min(MinPanelHeight, GetMaxPanelHeight(workingArea.Height));
+        _window.MaxHeight = GetMaxPanelHeight(workingArea.Height);
     }
 
     private void ClampWindowToWorkingArea(bool snapToSide)
@@ -421,13 +438,16 @@ public class PanelService
         if (_window == null)
             return;
 
-        var (waX, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
-        var maxWidth = GetMaxPanelWidth(waWidth);
-        var maxHeight = GetMaxPanelHeight(waHeight);
+        var workingArea = GetWorkingArea(refresh: !IsHidden);
+        var maxWidth = GetMaxPanelWidth(workingArea.Width);
+        var maxHeight = GetMaxPanelHeight(workingArea.Height);
         var minHeight = Math.Min(MinPanelHeight, maxHeight);
         var width = Clamp(_window.Width, MinPanelWidth, maxWidth);
         var height = Clamp(_window.Height, minHeight, maxHeight);
-        var top = Clamp(_window.Top, waY, GetMaxPanelTop(waY, waHeight, height));
+        var top = Clamp(
+            _window.Top,
+            workingArea.Y,
+            GetMaxPanelTop(workingArea.Y, workingArea.Height, height));
 
         _positioning = true;
         try
@@ -438,13 +458,13 @@ public class PanelService
 
             if (snapToSide)
             {
-                _window.Left = _isHidden
+                _window.Left = IsHidden
                     ? (_settings.PanelSide == PanelSide.Left
-                        ? waX - width + HiddenEdgeWidth
-                        : waX + waWidth - HiddenEdgeWidth)
+                        ? workingArea.X - width + HiddenEdgeWidth
+                        : workingArea.Right - HiddenEdgeWidth)
                     : (_settings.PanelSide == PanelSide.Left
-                        ? waX
-                        : waX + waWidth - width);
+                        ? workingArea.X
+                        : workingArea.Right - width);
             }
         }
         finally
@@ -488,11 +508,14 @@ public class PanelService
         if (_window == null)
             return;
 
-        var (_, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
-        var width = Clamp(_window.Width, MinPanelWidth, GetMaxPanelWidth(waWidth));
-        var maxHeight = GetMaxPanelHeight(waHeight);
+        var workingArea = GetWorkingArea(refresh: !IsHidden);
+        var width = Clamp(_window.Width, MinPanelWidth, GetMaxPanelWidth(workingArea.Width));
+        var maxHeight = GetMaxPanelHeight(workingArea.Height);
         var height = Clamp(_window.Height, Math.Min(MinPanelHeight, maxHeight), maxHeight);
-        var top = Clamp(_window.Top, waY, GetMaxPanelTop(waY, waHeight, height));
+        var top = Clamp(
+            _window.Top,
+            workingArea.Y,
+            GetMaxPanelTop(workingArea.Y, workingArea.Height, height));
 
         _settings.PanelWidth = (int)Math.Round(width);
         _settings.PanelHeight = (int)Math.Round(height);
@@ -505,13 +528,16 @@ public class PanelService
         if (_window == null || double.IsNaN(desiredHeight) || double.IsInfinity(desiredHeight))
             return;
 
-        var (waX, waY, waWidth, waHeight) = WindowHelper.GetWorkingArea(_window);
-        var maxHeight = GetMaxPanelHeight(waHeight);
+        var workingArea = GetWorkingArea(refresh: !IsHidden);
+        var maxHeight = GetMaxPanelHeight(workingArea.Height);
         var height = Clamp(desiredHeight, Math.Min(MinPanelHeight, maxHeight), maxHeight);
         if (Math.Abs(_window.Height - height) < 1)
             return;
 
-        var top = Clamp(_window.Top, waY, GetMaxPanelTop(waY, waHeight, height));
+        var top = Clamp(
+            _window.Top,
+            workingArea.Y,
+            GetMaxPanelTop(workingArea.Y, workingArea.Height, height));
 
         _positioning = true;
         try
@@ -519,13 +545,13 @@ public class PanelService
             ApplyWindowLimits();
             _window.Height = height;
             _window.Top = top;
-            _window.Left = _isHidden
+            _window.Left = IsHidden
                 ? (_settings.PanelSide == PanelSide.Left
-                    ? waX - _window.Width + HiddenEdgeWidth
-                    : waX + waWidth - HiddenEdgeWidth)
+                    ? workingArea.X - _window.Width + HiddenEdgeWidth
+                    : workingArea.Right - HiddenEdgeWidth)
                 : (_settings.PanelSide == PanelSide.Left
-                    ? waX
-                    : waX + waWidth - _window.Width);
+                    ? workingArea.X
+                    : workingArea.Right - _window.Width);
         }
         finally
         {
@@ -549,6 +575,20 @@ public class PanelService
 
         _pendingDesiredHeight = null;
         ApplyHeight(desiredHeight);
+    }
+
+    private WorkingArea GetWorkingArea(bool refresh = false)
+    {
+        if (_window == null)
+            return _lastWorkingArea ?? new WorkingArea(0, 0, SystemParameters.WorkArea.Width, SystemParameters.WorkArea.Height);
+
+        if (refresh || _lastWorkingArea == null)
+        {
+            var (x, y, width, height) = WindowHelper.GetWorkingArea(_window);
+            _lastWorkingArea = new WorkingArea(x, y, width, height);
+        }
+
+        return _lastWorkingArea.Value;
     }
 
     private static double GetMaxPanelWidth(double workingAreaWidth)
@@ -585,5 +625,10 @@ public class PanelService
         Hidden,
         Showing,
         Hiding
+    }
+
+    private readonly record struct WorkingArea(double X, double Y, double Width, double Height)
+    {
+        public double Right => X + Width;
     }
 }

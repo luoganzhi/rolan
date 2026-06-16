@@ -21,6 +21,13 @@ namespace Rolan.Views;
 
 public partial class MainWindow : Window
 {
+    private static readonly DependencyProperty AutoHideScopeProperty =
+        DependencyProperty.RegisterAttached(
+            "AutoHideScope",
+            typeof(IDisposable),
+            typeof(MainWindow),
+            new PropertyMetadata(null));
+
     private const int HotkeyId = 1;
     private const int DefaultHotkeyModifiers = 1; // Alt
     private const int DefaultHotkeyKey = 0x20;    // Space
@@ -188,7 +195,7 @@ public partial class MainWindow : Window
         AddMenuItem(menu, "导入开始菜单快捷方式", OnImportStartMenu);
         AddMenuItem(menu, "导入桌面快捷方式", OnImportDesktop);
 
-        SuppressAutoHideWhileOpen(menu);
+        BeginContextMenuAutoHideScope(menu);
         menu.IsOpen = true;
     }
 
@@ -235,7 +242,7 @@ public partial class MainWindow : Window
             menu.Items.Add(item);
         }
 
-        SuppressAutoHideWhileOpen(menu);
+        BeginContextMenuAutoHideScope(menu);
         menu.IsOpen = true;
     }
 
@@ -806,15 +813,18 @@ public partial class MainWindow : Window
 
     private void OnShortcutContextMenuOpened(object sender, RoutedEventArgs e)
     {
-        if (sender is not ContextMenu menu ||
-            menu.PlacementTarget is not FrameworkElement placement ||
+        if (sender is not ContextMenu menu)
+            return;
+
+        BeginContextMenuAutoHideScope(menu);
+
+        if (menu.PlacementTarget is not FrameworkElement placement ||
             placement.DataContext is not ShortcutItem item ||
             ViewModel == null)
         {
             return;
         }
 
-        SuppressAutoHideWhileOpen(menu);
         menu.DataContext = item;
         var openLocationMenu = menu.Items.OfType<MenuItem>()
             .FirstOrDefault(mi => string.Equals(mi.Header as string, "打开文件位置", StringComparison.Ordinal));
@@ -1046,19 +1056,40 @@ public partial class MainWindow : Window
         return PanelChromeHeight + contentHeight;
     }
 
-    private void SuppressAutoHideWhileOpen(ContextMenu menu)
+    private void OnContextMenuOpened(object sender, RoutedEventArgs e)
     {
+        if (sender is ContextMenu menu)
+            BeginContextMenuAutoHideScope(menu);
+    }
+
+    private void OnContextMenuClosed(object sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu)
+            EndContextMenuAutoHideScope(menu);
+    }
+
+    private void BeginContextMenuAutoHideScope(ContextMenu menu)
+    {
+        if (menu.GetValue(AutoHideScopeProperty) is IDisposable)
+            return;
+
         var autoHideScope = ViewModel?.PanelService.SuspendAutoHide();
         if (autoHideScope == null)
             return;
 
-        RoutedEventHandler? closedHandler = null;
-        closedHandler = (_, _) =>
-        {
-            menu.Closed -= closedHandler;
-            autoHideScope.Dispose();
-        };
-        menu.Closed += closedHandler;
+        menu.Closed -= OnContextMenuClosed;
+        menu.Closed += OnContextMenuClosed;
+        menu.SetValue(AutoHideScopeProperty, autoHideScope);
+    }
+
+    private void EndContextMenuAutoHideScope(ContextMenu menu)
+    {
+        if (menu.GetValue(AutoHideScopeProperty) is not IDisposable autoHideScope)
+            return;
+
+        menu.Closed -= OnContextMenuClosed;
+        menu.ClearValue(AutoHideScopeProperty);
+        autoHideScope.Dispose();
     }
 
     private void OnClosed(object? sender, EventArgs e)

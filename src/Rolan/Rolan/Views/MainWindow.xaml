@@ -47,7 +47,7 @@
                                 Padding="{TemplateBinding Padding}"
                                 Margin="{TemplateBinding Margin}">
                             <Border.ContextMenu>
-                                <ContextMenu>
+                                <ContextMenu Opened="OnContextMenuOpened" Closed="OnContextMenuClosed">
                                     <MenuItem Header="重命名" Click="OnRenameGroup" />
                                     <Separator />
                                     <MenuItem Header="删除分组" Click="OnDeleteGroup" />
@@ -145,7 +145,7 @@
                     DragOver="OnShortcutDragOver"
                     Drop="OnShortcutDrop">
                 <Border.ContextMenu>
-                    <ContextMenu Opened="OnShortcutContextMenuOpened">
+                    <ContextMenu Opened="OnShortcutContextMenuOpened" Closed="OnContextMenuClosed">
                         <MenuItem Header="打开" Click="OnOpenShortcut" />
                         <MenuItem Header="打开文件位置" Click="OnOpenFileLocation" />
                         <Separator />

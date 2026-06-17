@@ -364,7 +364,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.V && !IsSearchTextPasteShortcut() && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
+        if (e.Key == Key.V && !IsSearchBoxFocused() && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
         {
             e.Handled = true;
             await AddClipboardShortcutTargetsAsync(clipboardTargets, showResult: false);
@@ -567,8 +567,9 @@ public partial class MainWindow : Window
            e.Key == Key.C &&
            Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
-    private bool IsSearchTextPasteShortcut()
-        => Keyboard.FocusedElement == SearchBox && SearchBox.SelectionLength > 0;
+    private bool IsSearchBoxFocused()
+        => Keyboard.FocusedElement == SearchBox ||
+           (Keyboard.FocusedElement as DependencyObject)?.TryFindParent<System.Windows.Controls.TextBox>() == SearchBox;
 
     private void OnShortcutGridSelectionChanged(object sender, SelectionChangedEventArgs e)
         => ScrollSelectedShortcutIntoView();

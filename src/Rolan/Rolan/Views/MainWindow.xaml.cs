@@ -364,7 +364,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.V && !IsSearchBoxFocused() && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
+        if (IsSearchBoxFocused())
+            return;
+
+        if (e.Key == Key.V && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
         {
             e.Handled = true;
             await AddClipboardShortcutTargetsAsync(clipboardTargets, showResult: false);

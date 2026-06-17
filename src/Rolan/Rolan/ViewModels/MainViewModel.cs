@@ -150,7 +150,8 @@ public partial class MainViewModel : ObservableObject
         {
             return Groups.SelectMany(g => g.Items)
                 .Where(i => MatchesSearch(i, SearchText))
-                .OrderByDescending(i => i.LaunchCount)
+                .OrderBy(i => GetSearchRank(i, SearchText))
+                .ThenByDescending(i => i.LaunchCount)
                 .ThenByDescending(i => i.LastLaunchedAt ?? DateTime.MinValue)
                 .ThenBy(i => i.Name)
                 .ToList();
@@ -189,8 +190,33 @@ public partial class MainViewModel : ObservableObject
         return searchTerms.Length == 0 || searchTerms.All(term => MatchesSearchTerm(item, term));
     }
 
+    private static int GetSearchRank(ShortcutItem item, string searchText)
+    {
+        var searchTerms = SplitSearchTerms(searchText);
+        return searchTerms.Length == 0
+            ? 0
+            : searchTerms.Max(term => GetSearchTermRank(item, term));
+    }
+
     private static string[] SplitSearchTerms(string searchText)
         => searchText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static int GetSearchTermRank(ShortcutItem item, string searchTerm)
+    {
+        if (EqualsSearch(item.Name, searchTerm))
+            return 0;
+
+        if (StartsWithSearch(item.Name, searchTerm))
+            return 1;
+
+        if (Contains(item.Name, searchTerm))
+            return 2;
+
+        if (StartsWithSearchAlias(item.Name, searchTerm))
+            return 3;
+
+        return 4;
+    }
 
     private static bool MatchesSearchTerm(ShortcutItem item, string searchTerm)
     {
@@ -211,6 +237,14 @@ public partial class MainViewModel : ObservableObject
         => !string.IsNullOrWhiteSpace(value) &&
            value.Contains(searchText, StringComparison.OrdinalIgnoreCase);
 
+    private static bool EqualsSearch(string? value, string searchText)
+        => !string.IsNullOrWhiteSpace(value) &&
+           string.Equals(value.Trim(), searchText, StringComparison.OrdinalIgnoreCase);
+
+    private static bool StartsWithSearch(string? value, string searchText)
+        => !string.IsNullOrWhiteSpace(value) &&
+           value.Trim().StartsWith(searchText, StringComparison.OrdinalIgnoreCase);
+
     private static bool ContainsSearchAlias(string? value, string searchText)
     {
         if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(searchText))
@@ -222,6 +256,18 @@ public partial class MainViewModel : ObservableObject
                searchAlias.Length > 0 &&
                (alias.Contains(searchAlias, StringComparison.OrdinalIgnoreCase) ||
                 IsOrderedSubsequence(alias, searchAlias));
+    }
+
+    private static bool StartsWithSearchAlias(string? value, string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(searchText))
+            return false;
+
+        var alias = BuildSearchAlias(value);
+        var searchAlias = BuildSearchAlias(searchText);
+        return alias.Length > 0 &&
+               searchAlias.Length > 0 &&
+               alias.StartsWith(searchAlias, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildSearchAlias(string value)

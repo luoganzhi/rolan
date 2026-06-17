@@ -198,6 +198,8 @@ public partial class MainViewModel : ObservableObject
                || ContainsSearchAlias(item.Name, searchTerm)
                || Contains(item.TargetPath, searchTerm)
                || ContainsSearchAlias(item.TargetPath, searchTerm)
+               || Contains(item.GroupName, searchTerm)
+               || ContainsSearchAlias(item.GroupName, searchTerm)
                || Contains(item.Arguments, searchTerm)
                || ContainsSearchAlias(item.Arguments, searchTerm)
                || Contains(item.WorkingDirectory, searchTerm)
@@ -385,6 +387,12 @@ public partial class MainViewModel : ObservableObject
     private void SelectPreviousShortcut()
     {
         MoveShortcutSelection(-1);
+    }
+
+    [RelayCommand]
+    private void SelectShortcutByOffset(int offset)
+    {
+        MoveShortcutSelection(offset);
     }
 
     [RelayCommand]

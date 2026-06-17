@@ -539,9 +539,15 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Down:
-                ViewModel?.SelectNextShortcutCommand.Execute(null);
+                ViewModel?.SelectShortcutByOffsetCommand.Execute(GetShortcutGridColumnCount());
                 break;
             case Key.Up:
+                ViewModel?.SelectShortcutByOffsetCommand.Execute(-GetShortcutGridColumnCount());
+                break;
+            case Key.Right:
+                ViewModel?.SelectNextShortcutCommand.Execute(null);
+                break;
+            case Key.Left:
                 ViewModel?.SelectPreviousShortcutCommand.Execute(null);
                 break;
             case Key.PageDown:
@@ -563,6 +569,15 @@ public partial class MainWindow : Window
         ScrollSelectedShortcutIntoView();
         e.Handled = true;
         return true;
+    }
+
+    private int GetShortcutGridColumnCount()
+    {
+        var gridWidth = ShortcutGrid.ActualWidth > 0
+            ? ShortcutGrid.ActualWidth
+            : Math.Max(ShortcutTileWidth, ActualWidth - MainBorder.Margin.Left - MainBorder.Margin.Right);
+        var availableGridWidth = Math.Max(ShortcutTileWidth, gridWidth - ShortcutGrid.Padding.Left - ShortcutGrid.Padding.Right);
+        return Math.Max(1, (int)Math.Floor(availableGridWidth / ShortcutTileWidth));
     }
 
     private bool HandleSelectedShortcutKey(System.Windows.Input.KeyEventArgs e, bool allowPlainDelete)
@@ -1093,11 +1108,7 @@ public partial class MainWindow : Window
     private double CalculateDesiredPanelHeight()
     {
         var itemCount = ShortcutGrid.Items.Count;
-        var gridWidth = ShortcutGrid.ActualWidth > 0
-            ? ShortcutGrid.ActualWidth
-            : Math.Max(ShortcutTileWidth, ActualWidth - MainBorder.Margin.Left - MainBorder.Margin.Right);
-        var availableGridWidth = Math.Max(ShortcutTileWidth, gridWidth - ShortcutGrid.Padding.Left - ShortcutGrid.Padding.Right);
-        var columns = Math.Max(1, (int)Math.Floor(availableGridWidth / ShortcutTileWidth));
+        var columns = GetShortcutGridColumnCount();
         var rows = itemCount == 0 ? 0 : (int)Math.Ceiling(itemCount / (double)columns);
         var contentHeight = itemCount == 0
             ? EmptyContentHeight

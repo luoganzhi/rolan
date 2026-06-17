@@ -23,6 +23,7 @@
         <cvt:NullToVisibilityConverter x:Key="NullToVis" />
         <cvt:ShortcutTypeToGlyphConverter x:Key="ShortcutTypeGlyph" />
         <cvt:ShortcutTooltipConverter x:Key="ShortcutTooltip" />
+        <cvt:ShortcutLaunchCueConverter x:Key="ShortcutLaunchCue" />
 
         <!-- 分组标签样式 -->
         <Style x:Key="GroupTabItem" TargetType="ListBoxItem">
@@ -171,26 +172,52 @@
                     </ContextMenu>
                 </Border.ContextMenu>
                 <StackPanel>
-                    <Border Width="48" Height="48"
-                            CornerRadius="6"
-                            Background="#FFF"
-                            BorderBrush="#CCC"
-                            BorderThickness="1"
-                            HorizontalAlignment="Center">
-                        <Grid>
-                            <TextBlock Text="{Binding Type, Converter={StaticResource ShortcutTypeGlyph}}"
-                                       Visibility="{Binding IconData, Converter={StaticResource NullToVis}}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="#607080"
+                    <Grid Width="54" Height="50" HorizontalAlignment="Center">
+                        <Border Width="48" Height="48"
+                                CornerRadius="6"
+                                Background="#FFF"
+                                BorderBrush="#CCC"
+                                BorderThickness="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top">
+                            <Grid>
+                                <TextBlock Text="{Binding Type, Converter={StaticResource ShortcutTypeGlyph}}"
+                                           Visibility="{Binding IconData, Converter={StaticResource NullToVis}}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="#607080"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                                <Image Source="{Binding IconData, Converter={StaticResource IconConverter}}"
+                                       Width="32" Height="32"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
-                            <Image Source="{Binding IconData, Converter={StaticResource IconConverter}}"
-                                   Width="32" Height="32"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                        </Grid>
-                    </Border>
+                            </Grid>
+                        </Border>
+                        <Border Width="16"
+                                Height="16"
+                                Background="#2F6FB3"
+                                BorderBrush="White"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Visibility="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                                     Path=(ItemsControl.AlternationIndex),
+                                                     Converter={StaticResource ShortcutLaunchCue},
+                                                     ConverterParameter=Visibility}">
+                            <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                                      Path=(ItemsControl.AlternationIndex),
+                                                      Converter={StaticResource ShortcutLaunchCue}}"
+                                       FontSize="9"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       LineHeight="10"
+                                       LineStackingStrategy="BlockLineHeight" />
+                        </Border>
+                    </Grid>
                     <TextBlock Text="{Binding Name}"
                                FontSize="10"
                                TextAlignment="Center"
@@ -372,6 +399,7 @@
                      SelectedItem="{Binding SelectedShortcut, Mode=TwoWay}"
                      ItemTemplate="{StaticResource ShortcutItemTemplate}"
                      ItemContainerStyle="{StaticResource ShortcutListBoxItem}"
+                     AlternationCount="1000000"
                      Background="Transparent"
                      BorderThickness="0"
                      Padding="4"

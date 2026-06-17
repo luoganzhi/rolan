@@ -325,6 +325,7 @@ public partial class MainViewModel : ObservableObject
     private async Task LaunchItem(ShortcutItem? item)
     {
         if (item == null) return;
+        var shouldClearSearch = IsSearching;
         if (!_shellService.Launch(item.TargetPath, item.Arguments, item.WorkingDirectory))
             return;
 
@@ -333,7 +334,7 @@ public partial class MainViewModel : ObservableObject
         await _dataService.RecordItemLaunchAsync(item.Id, item.LaunchCount, item.LastLaunchedAt.Value);
         RefreshFilteredItems();
 
-        CompleteSuccessfulLaunch(clearSearchText: false);
+        CompleteSuccessfulLaunch(clearSearchText: shouldClearSearch);
     }
 
     [RelayCommand]

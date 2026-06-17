@@ -214,6 +214,7 @@ public partial class MainWindow : Window
 
         AddMenuItem(menu, "添加文件...", OnBrowseAdd);
         AddMenuItem(menu, "添加路径或网址...", OnAddPathOrUrl);
+        AddMenuItem(menu, "从剪贴板添加", OnAddFromClipboard);
         AddMenuItem(menu, "添加文件夹...", OnBrowseAddFolder);
         AddMenuItem(menu, "添加系统命令...", OnAddSystemCommand);
         menu.Items.Add(new System.Windows.Controls.Separator());
@@ -226,6 +227,19 @@ public partial class MainWindow : Window
 
     private void OnBrowseAdd(object sender, RoutedEventArgs e)
         => ViewModel?.BrowseAddShortcutCommand.Execute(null);
+
+    private async void OnAddFromClipboard(object sender, RoutedEventArgs e)
+    {
+        if (TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
+        {
+            await AddClipboardShortcutTargetsAsync(clipboardTargets, showResult: true);
+            _ = Dispatcher.BeginInvoke(FocusSearchBox);
+            return;
+        }
+
+        ShowMessage("剪贴板中没有可添加的文件、文件夹、网址或系统命令。",
+            System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+    }
 
     private async void OnAddPathOrUrl(object sender, RoutedEventArgs e)
     {
@@ -341,7 +355,7 @@ public partial class MainWindow : Window
         if (e.Key == Key.V && !IsSearchTextPasteShortcut() && TryGetShortcutTargetsFromClipboard(out var clipboardTargets))
         {
             e.Handled = true;
-            await AddClipboardShortcutTargetsAsync(clipboardTargets);
+            await AddClipboardShortcutTargetsAsync(clipboardTargets, showResult: false);
             _ = Dispatcher.BeginInvoke(FocusSearchBox);
             return;
         }
@@ -395,16 +409,37 @@ public partial class MainWindow : Window
         return -1;
     }
 
-    private async Task AddClipboardShortcutTargetsAsync(string[] targets)
+    private async Task AddClipboardShortcutTargetsAsync(string[] targets, bool showResult)
     {
         if (ViewModel == null)
             return;
 
+        var added = 0;
         foreach (var target in targets)
+        {
+            var countBefore = CountShortcuts();
             await ViewModel.AddShortcutCommand.ExecuteAsync(target);
+            var countAfter = CountShortcuts();
+            if (countAfter > countBefore)
+                added += countAfter - countBefore;
+        }
 
         ScrollSelectedShortcutIntoView();
+
+        if (!showResult)
+            return;
+
+        var skipped = Math.Max(0, targets.Length - added);
+        var message = added > 0 && skipped > 0
+            ? $"已从剪贴板添加 {added} 个快捷方式，跳过 {skipped} 个重复项。"
+            : added > 0
+                ? $"已从剪贴板添加 {added} 个快捷方式。"
+            : "剪贴板中的快捷方式已存在于当前分组。";
+        ShowMessage(message, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
     }
+
+    private int CountShortcuts()
+        => ViewModel?.Groups.Sum(group => group.Items.Count) ?? 0;
 
     private static bool TryGetShortcutTargetsFromClipboard(out string[] targets)
     {

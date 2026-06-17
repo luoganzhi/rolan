@@ -198,6 +198,13 @@ public partial class MainWindow : Window
     private void OnHideClick(object sender, RoutedEventArgs e)
         => ViewModel?.ToggleVisibilityCommand.Execute(null);
 
+    private void OnClearSearchClick(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        RequestSearchFocus();
+        e.Handled = true;
+    }
+
     private async void OnAddGroupClick(object sender, RoutedEventArgs e)
         => await AddGroupWithNameAsync();
 

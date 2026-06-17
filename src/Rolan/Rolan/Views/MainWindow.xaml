@@ -318,16 +318,32 @@
                     Background="#E0E0E0"
                     Padding="8,4"
                     Height="30">
-                <TextBox x:Name="SearchBox"
-                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="12"
-                         Padding="4,0"
-                         Background="White"
-                         BorderBrush="#C0C0C0"
-                         BorderThickness="1"
-                         VerticalContentAlignment="Center"
-                         KeyDown="OnSearchKeyDown"
-                         ToolTip="搜索快捷方式..." />
+                <Grid>
+                    <TextBox x:Name="SearchBox"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             FontSize="12"
+                             Padding="4,0,24,0"
+                             Background="White"
+                             BorderBrush="#C0C0C0"
+                             BorderThickness="1"
+                             VerticalContentAlignment="Center"
+                             KeyDown="OnSearchKeyDown"
+                             ToolTip="搜索快捷方式..." />
+                    <Button Width="22"
+                            Height="22"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,2,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Content="×"
+                            FontSize="14"
+                            Foreground="#6A6A6A"
+                            Cursor="Hand"
+                            Click="OnClearSearchClick"
+                            ToolTip="清空搜索"
+                            Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}" />
+                </Grid>
             </Border>
 
             <!-- 标签页栏 -->

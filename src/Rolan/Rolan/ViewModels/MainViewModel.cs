@@ -355,9 +355,11 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        if (TryNormalizeDirectLaunchTarget(query, out var targetPath) && _shellService.Launch(targetPath))
+        if (TryNormalizeDirectLaunchTarget(query, out var targetPath))
         {
-            CompleteSuccessfulLaunch(clearSearchText: true);
+            if (_shellService.Launch(targetPath))
+                CompleteSuccessfulLaunch(clearSearchText: true);
+
             return;
         }
 

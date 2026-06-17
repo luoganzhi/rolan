@@ -95,6 +95,12 @@ public class PanelService
         if (_window == null || _positioning || _sliding)
             return;
 
+        if (_settings.AutoFitPanelHeight && e.HeightChanged)
+        {
+            _settings.AutoFitPanelHeight = false;
+            _pendingDesiredHeight = null;
+        }
+
         ApplyWindowLimits();
         ClampWindowToWorkingArea(snapToSide: true);
         SavePlacementDebounced();

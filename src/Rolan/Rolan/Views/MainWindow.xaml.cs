@@ -116,6 +116,12 @@ public partial class MainWindow : Window
         _ = Dispatcher.BeginInvoke(FocusSearchBox, DispatcherPriority.ContextIdle);
     }
 
+    private void ClearSearchAndRequestFocus()
+    {
+        SearchBox.Clear();
+        RequestSearchFocus();
+    }
+
     private void OnMainWindowLoaded(object sender, RoutedEventArgs e)
     {
         if (!_isPanelHeightFitAttached)
@@ -200,8 +206,7 @@ public partial class MainWindow : Window
 
     private void OnClearSearchClick(object sender, RoutedEventArgs e)
     {
-        SearchBox.Clear();
-        RequestSearchFocus();
+        ClearSearchAndRequestFocus();
         e.Handled = true;
     }
 
@@ -1336,14 +1341,14 @@ public partial class MainWindow : Window
         {
             Activate();
             panelService?.AnimateShow();
-            RequestSearchFocus();
+            ClearSearchAndRequestFocus();
             return;
         }
 
         if (!IsActive)
         {
             Activate();
-            RequestSearchFocus();
+            ClearSearchAndRequestFocus();
             return;
         }
 

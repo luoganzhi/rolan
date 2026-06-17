@@ -536,7 +536,7 @@ public partial class MainWindow : Window
 
     private void OnSearchKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (IsSearchTextCopyShortcut(e))
+        if (IsSearchTextEditShortcut(e))
             return;
 
         if (HandleSelectedShortcutKey(e, allowPlainDelete: string.IsNullOrEmpty(SearchBox.Text)))
@@ -562,10 +562,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private bool IsSearchTextCopyShortcut(System.Windows.Input.KeyEventArgs e)
-        => SearchBox.SelectionLength > 0 &&
-           e.Key == Key.C &&
-           Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+    private static bool IsSearchTextEditShortcut(System.Windows.Input.KeyEventArgs e)
+    {
+        if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            return false;
+
+        return e.Key is Key.A or Key.C or Key.V or Key.X;
+    }
 
     private bool IsSearchBoxFocused()
         => Keyboard.FocusedElement == SearchBox ||

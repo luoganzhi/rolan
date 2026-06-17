@@ -288,7 +288,13 @@ public partial class MainWindow : Window
             item.Click += async (_, _) =>
             {
                 if (ViewModel != null)
-                    await ViewModel.AddShortcutCommand.ExecuteAsync(command.TargetPath);
+                {
+                    var added = await AddShortcutAndDetectChangeAsync(command.TargetPath);
+                    var message = added
+                        ? $"已添加系统命令：{command.Name}"
+                        : $"系统命令已存在于当前分组：{command.Name}";
+                    ShowMessage(message, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                }
             };
             menu.Items.Add(item);
         }
@@ -432,11 +438,8 @@ public partial class MainWindow : Window
         var added = 0;
         foreach (var target in targets)
         {
-            var countBefore = CountShortcuts();
-            await ViewModel.AddShortcutCommand.ExecuteAsync(target);
-            var countAfter = CountShortcuts();
-            if (countAfter > countBefore)
-                added += countAfter - countBefore;
+            if (await AddShortcutAndDetectChangeAsync(target))
+                added++;
         }
 
         ScrollSelectedShortcutIntoView();
@@ -455,6 +458,16 @@ public partial class MainWindow : Window
 
     private int CountShortcuts()
         => ViewModel?.Groups.Sum(group => group.Items.Count) ?? 0;
+
+    private async Task<bool> AddShortcutAndDetectChangeAsync(string target)
+    {
+        if (ViewModel == null)
+            return false;
+
+        var countBefore = CountShortcuts();
+        await ViewModel.AddShortcutCommand.ExecuteAsync(target);
+        return CountShortcuts() > countBefore;
+    }
 
     private static bool TryGetShortcutTargetsFromClipboard(out string[] targets)
     {

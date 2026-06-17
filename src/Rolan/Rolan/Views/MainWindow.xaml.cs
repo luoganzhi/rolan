@@ -570,7 +570,16 @@ public partial class MainWindow : Window
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             return false;
 
-        return e.Key is Key.A or Key.C or Key.V or Key.X;
+        return e.Key is Key.A
+            or Key.C
+            or Key.V
+            or Key.X
+            or Key.Back
+            or Key.Delete
+            or Key.Left
+            or Key.Right
+            or Key.Home
+            or Key.End;
     }
 
     private bool IsSearchBoxFocused()

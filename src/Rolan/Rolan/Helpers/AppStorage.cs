@@ -9,9 +9,13 @@ internal static class AppStorage
     private const string PortableMarkerFileName = "portable.flag";
     private const string DataDirectoryEnvironmentVariable = "ROLAN_DATA_DIR";
 
+    public static string PortableDataDirectory => Path.Combine(AppContext.BaseDirectory, LocalDataDirectoryName);
+    public static string PortableMarkerPath => Path.Combine(AppContext.BaseDirectory, PortableMarkerFileName);
+    public static bool IsEnvironmentOverrideActive => !string.IsNullOrWhiteSpace(GetEnvironmentOverrideDirectory());
+
     public static string GetDataDirectory()
     {
-        var overrideDirectory = Environment.GetEnvironmentVariable(DataDirectoryEnvironmentVariable);
+        var overrideDirectory = GetEnvironmentOverrideDirectory();
         if (!string.IsNullOrWhiteSpace(overrideDirectory))
             return NormalizeDirectory(overrideDirectory);
 
@@ -23,18 +27,16 @@ internal static class AppStorage
 
     public static bool IsPortableMode()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        return File.Exists(Path.Combine(baseDirectory, PortableMarkerFileName)) ||
-               Directory.Exists(Path.Combine(baseDirectory, LocalDataDirectoryName));
+        return File.Exists(PortableMarkerPath) ||
+               Directory.Exists(PortableDataDirectory);
     }
 
     private static string GetWritablePortableDirectoryOrFallback()
     {
-        var portableDirectory = Path.Combine(AppContext.BaseDirectory, LocalDataDirectoryName);
         try
         {
-            Directory.CreateDirectory(portableDirectory);
-            return portableDirectory;
+            Directory.CreateDirectory(PortableDataDirectory);
+            return PortableDataDirectory;
         }
         catch
         {
@@ -44,6 +46,9 @@ internal static class AppStorage
 
     private static string GetRoamingDataDirectory()
         => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppDataDirectoryName);
+
+    private static string? GetEnvironmentOverrideDirectory()
+        => Environment.GetEnvironmentVariable(DataDirectoryEnvironmentVariable);
 
     private static string NormalizeDirectory(string directory)
     {

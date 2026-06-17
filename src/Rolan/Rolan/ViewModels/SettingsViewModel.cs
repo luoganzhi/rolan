@@ -69,12 +69,20 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _selectedHotkeyKeyIndex;
 
+    [ObservableProperty]
+    private string _dataDirectory;
+
+    [ObservableProperty]
+    private string _dataModeDescription;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EnablePortableModeCommand))]
+    private bool _canEnablePortableMode;
+
     public string[] Themes { get; }
     public string[] PanelSides { get; } = { "左侧", "右侧" };
     public string[] HotkeyModifierOptions { get; } = ModifierChoices.Select(c => c.Label).ToArray();
     public string[] HotkeyKeyOptions { get; } = KeyChoices.Select(c => c.Label).ToArray();
-    public string DataDirectory => _dataDirectoryService.DataDirectory;
-
     public SettingsViewModel(
         MainViewModel mainVm,
         PanelService panelService,
@@ -106,6 +114,9 @@ public partial class SettingsViewModel : ObservableObject
         _selectedHotkeyKeyIndex = FindChoiceIndex(KeyChoices, _settings.HotkeyKey);
 
         Themes = _themeService.AvailableThemes;
+        _dataDirectory = _dataDirectoryService.DataDirectory;
+        _dataModeDescription = _dataDirectoryService.DataModeDescription;
+        _canEnablePortableMode = _dataDirectoryService.CanEnablePortableMode;
     }
 
     [RelayCommand]
@@ -150,6 +161,28 @@ public partial class SettingsViewModel : ObservableObject
         {
             ShowMessage(
                 $"无法打开数据目录：{ex.Message}",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEnablePortableMode))]
+    private void EnablePortableMode()
+    {
+        try
+        {
+            _dataDirectoryService.EnablePortableMode();
+            RefreshDataDirectoryState();
+            ShowMessage(
+                "已启用便携模式。当前数据已复制到程序目录的 data 文件夹，重启 Rolan 后将使用便携数据目录。",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            RefreshDataDirectoryState();
+            ShowMessage(
+                $"无法启用便携模式：{ex.Message}",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Warning);
         }
@@ -224,6 +257,13 @@ public partial class SettingsViewModel : ObservableObject
         => _owner == null
             ? System.Windows.MessageBox.Show(message, "Rolan", buttons, image)
             : System.Windows.MessageBox.Show(_owner, message, "Rolan", buttons, image);
+
+    private void RefreshDataDirectoryState()
+    {
+        DataDirectory = _dataDirectoryService.DataDirectory;
+        DataModeDescription = _dataDirectoryService.DataModeDescription;
+        CanEnablePortableMode = _dataDirectoryService.CanEnablePortableMode;
+    }
 
     private static int FindChoiceIndex(HotkeyChoice[] choices, int value)
     {

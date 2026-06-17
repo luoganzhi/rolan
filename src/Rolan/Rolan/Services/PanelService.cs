@@ -32,6 +32,8 @@ public class PanelService
     private const int MinPanelWidth = 280;
     private const int MaxPanelWidth = 720;
     private const int MinPanelHeight = 240;
+    private const int DefaultPanelWidth = 360;
+    private const int DefaultPanelHeight = 720;
     private const int SlideStepPx = 16;
     private const int SlideIntervalMs = 10;
     private const int EdgePollIntervalMs = 200;
@@ -386,6 +388,27 @@ public class PanelService
 
         ClampWindowToWorkingArea(snapToSide: true);
         SavePlacementNow();
+    }
+
+    public void ResetPanelPlacement()
+    {
+        StopSlide();
+        _isHidden = false;
+        _visibilityState = PanelVisibilityState.Shown;
+        _pendingDesiredHeight = null;
+
+        _settings.PanelWidth = DefaultPanelWidth;
+        _settings.PanelHeight = DefaultPanelHeight;
+        _settings.PanelTop = null;
+        _settings.AutoFitPanelHeight = true;
+        _settings.Save();
+
+        if (_window == null)
+            return;
+
+        _lastWorkingArea = null;
+        PositionPanel();
+        VisibilityChanged?.Invoke();
     }
 
     public void FitHeightToContent(double desiredHeight)

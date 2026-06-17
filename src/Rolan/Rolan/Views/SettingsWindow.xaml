@@ -58,6 +58,13 @@
                                   SelectedIndex="{Binding SelectedPanelSideIndex, Mode=TwoWay}" />
                     </StackPanel>
                     <CheckBox IsChecked="{Binding AutoFitPanelHeight}" Content="按内容自动调整面板高度" />
+                    <Button Content="重置面板大小和位置"
+                            Width="150" Height="30"
+                            HorizontalAlignment="Left"
+                            Margin="0,6,0,0"
+                            Command="{Binding ResetPanelPlacementCommand}"
+                            Background="#7F8C8D" Foreground="White"
+                            BorderThickness="0" FontSize="12" Cursor="Hand" />
                 </StackPanel>
             </Border>
 

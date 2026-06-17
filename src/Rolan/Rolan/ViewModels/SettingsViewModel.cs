@@ -189,6 +189,22 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ResetPanelPlacement()
+    {
+        AutoFitPanelHeight = true;
+        _settings.PanelWidth = 360;
+        _settings.PanelHeight = 720;
+        _settings.PanelTop = null;
+        _settings.AutoFitPanelHeight = true;
+        _panelService.ResetPanelPlacement();
+        _mainVm.NotifySettingsUpdated(_settings);
+        ShowMessage(
+            "已重置面板大小和位置。",
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
     private async Task ExportData()
     {
         var dialog = new Microsoft.Win32.SaveFileDialog

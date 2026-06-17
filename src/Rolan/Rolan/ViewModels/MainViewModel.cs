@@ -356,7 +356,18 @@ public partial class MainViewModel : ObservableObject
         }
 
         if (TryNormalizeDirectLaunchTarget(query, out var targetPath) && _shellService.Launch(targetPath))
+        {
             CompleteSuccessfulLaunch(clearSearchText: true);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            _panelService.ShowMessage(
+                $"未找到可启动项：{query}",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        }
     }
 
     private void CompleteSuccessfulLaunch(bool clearSearchText)
